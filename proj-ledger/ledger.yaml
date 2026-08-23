@@ -1,0 +1,23 @@
+version: 1
+name: wx-teleport-cartridge-ledger
+
+active:
+  - id: car-teleport
+    roadmap: roadmaps/car-teleport.md
+    memories: memories/teleport
+  - id: broker
+    roadmap: roadmaps/broker.md
+    memories: memories/teleport/broker
+
+ownership:
+  neutral_package: ../../src
+  tests: ../../tests
+  consumers:
+    - ../../../jtwc
+    - ../../../wx-ui-melt
+    - ../../../supa-mail-hook/supa-svelte
+
+invariants:
+  - Roadmaps own work state; memories own durable contracts and rationale.
+  - Generic protocol work lands here; application codecs and effects land in their source workspaces.
+  - A completed claim requires direct implementation and conformance evidence.

@@ -1,0 +1,32 @@
+schema: wx-workspace-map/v1
+workspace: wx-teleport-cartridge
+role: framework-neutral-teleport-library
+summary: Owns canonical capability codecs, CAR graphs, protection, restore orchestration, and transport ports without application runtime dependencies.
+
+tooling:
+  entrypoint: mise
+  runtime: bun
+  install: mise run install
+  link: mise run link
+  check: mise run check
+  test: mise run test
+  verify: mise run verify
+
+orientation:
+  control: proj-ledger/control.yaml
+  roadmap: proj-ledger/roadmaps/car-teleport.md
+  additional_roadmaps:
+    - proj-ledger/roadmaps/broker.md
+  triggers: proj-ledger/triggers.yaml
+  memory_root: proj-ledger/memories/teleport
+
+consumers:
+  - ../jtwc
+  - ../wx-ui-melt
+  - ../supa-mail-hook/supa-svelte
+
+boundaries:
+  - No Svelte, React, Fireproof runtime, Deno API, browser UI, or application store ownership.
+  - Application workspaces own capability adapters and restore effects.
+  - wx-shells does not compile or route this library directly.
+  - Consumer roadmaps own integration state; this workspace roadmap owns the generic seven-layer protocol, implementation sequence, and conformance state.

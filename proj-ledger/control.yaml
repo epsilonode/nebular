@@ -1,0 +1,36 @@
+enabled: true
+mode: normal
+router_version: 1
+
+hot_path:
+  t0:
+    read:
+      - ../../workspace-map.yaml
+      - ../../AGENTS.md
+  t1:
+    grep:
+      paths:
+        - roadmaps/car-teleport.md
+        - roadmaps/broker.md
+      pattern: '^(@roadmap|@meta|## @tier|### @(work|proof|risk|gap|unknown|blocker|decision|finding) )'
+    enter: Read the highest open tier item relevant to the task, then only its linked memory hooks and bodies.
+    avoid:
+      - reading the full roadmap during routine orientation
+      - treating consumer application adapters as neutral package code
+      - using globally resolved runtime or package commands outside Mise
+
+active:
+  - id: car-teleport
+    path: roadmaps/car-teleport.md
+  - id: broker
+    path: roadmaps/broker.md
+
+routes:
+  triggers: triggers.yaml
+  roadmap_format: format-guidance.md
+  memory_guidance: making-memories.md
+  tooling: ../../mise.toml
+
+notes:
+  - The roadmap owns generic protocol state; JTWC, wx-ui-melt, and Supa roadmaps own their adapters and deployment integrations.
+  - Search memory frontmatter hooks before reading bodies.

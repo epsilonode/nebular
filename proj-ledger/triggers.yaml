@@ -1,0 +1,113 @@
+version: 1
+purpose: Read only the memory cards matching the current Teleport concern.
+
+must_know:
+  credential_broker:
+    path: roadmaps/broker.md
+    read_before: [api tokens, credentials, OS keychain, agent secret requests, encrypted CAR PIN or passphrase, child-process environment injection, credential requirements]
+  broker_recipe_authority:
+    path: memories/teleport/broker/broker-git-recipe-command-authority.md
+    read_before: [secret recipe, recipe runner, Git-scoped command, interpreted entrypoint, recipe revision, command authority, agentic output]
+  broker_recipe_v1:
+    path: memories/teleport/broker/broker-recipe-v1-wire-revision-contract.md
+    read_before: [recipe v1, wx.recipe/v1, recipe XML schema, credential slot XML, canonical recipe, recipe revision digest, recipe inheritance digest]
+  broker_pk_recipe_adoption:
+    path: memories/teleport/broker/broker-pk-recipe-runner-adoption.md
+    read_before: [pk recipe format, leaf recipe, recipe lifecycle, recipe IPC, heartbeat, output cursor, PM2 receiver, direct receiver, observe-only receiver]
+  broker_bake_recipe_extraction:
+    path: memories/teleport/broker/broker-bake-recipe-kernel-extraction.md
+    read_before: [Bake recipe extraction, pk recipe source, "@bake/recipe", recipe kernel, recipe transplant, Bake in place]
+  broker_local_recipe_bundle:
+    path: memories/teleport/broker/broker-local-recipe-integration-and-bundling.md
+    read_before: [compile recipe runner, single file recipe runner, recipe-runner.js, broker.js recipe parsing, shared recipe source, Bake bundle import]
+  broker_public_distribution:
+    path: memories/teleport/broker/broker-epsilonode-nebular-esm-distribution.md
+    read_before: [epsilonode, nebular, public repository, GitHub upstream, esm.sh, remote TypeScript import, immutable module ref, package prefix, four TypeScript deliverables]
+  broker_recipe_cutover:
+    path: memories/teleport/broker/broker-recipe-parity-provenance-and-cutover.md
+    read_before: [recipe parity, Bake fixtures, recipe provenance, Bake cutover, differential recipe tests, upstream recipe drift]
+  broker_process_receiver:
+    path: memories/teleport/broker/broker-universal-process-receiver.md
+    read_before: [process receiver, PM2 integration, systemd adapter, hanging process, stalled process, long lived process, cancellation, Windows process tree, Job Object, bounded execution]
+  broker_python_receiver:
+    path: memories/teleport/broker/broker-python-uv-windows-job-receiver.md
+    read_before: [Python receiver, uv receiver, Windows Job Object receiver, pywin32, psutil, named pipe receiver, alternative to PM2, receiver journal]
+  broker_universal_process_contract:
+    path: memories/teleport/broker/broker-universal-process-contract.md
+    read_before: [process bounds, runtime timeout, startup deadline, stall policy, cancellation deadline, unbounded command, lifecycle class]
+  broker_receiver_algebra:
+    path: memories/teleport/broker/broker-process-receiver-algebra.md
+    read_before: [ProcessReceiver, backend adapter, receiver algebra, receiver capability, PM2 adapter, systemd receiver, launchd receiver]
+  broker_direct_receiver:
+    path: memories/teleport/broker/broker-direct-receiver-materialization.md
+    read_before: [PM2 role, direct materialization, PM2 config, PM2 restart, PM2 exact name, process subtree, wrapper overhead, credential bootstrap]
+  broker_pm2_mise_runtime:
+    path: memories/teleport/broker/broker-pm2-mise-runtime-contract.md
+    read_before: [PM2 install, PM2 version, Node for PM2, Mise Node, global PM2, bunx pm2, PM2 daemon runtime]
+  broker_windows_tree_proof:
+    path: memories/teleport/broker/broker-windows-process-tree-conformance.md
+    read_before: [Windows process tree, PM2 tree kill, descendant cleanup, cancellation proof, orphan child, taskkill, Job Object fallback]
+  broker_agent_observability:
+    path: memories/teleport/broker/broker-agent-objective-observability.md
+    read_before: [agent observability, heartbeat, tick tock, output cursor, hanging process, stalled process, readiness, liveness, next action]
+  broker_receiver_secrets:
+    path: memories/teleport/broker/broker-receiver-secret-delivery.md
+    read_before: [PM2 secret, receiver secret delivery, credential environment, secret lease, Bun.secrets process, revocation cleanup]
+  broker_bootstrap_entrypoint:
+    path: memories/teleport/broker/broker-cooperative-bootstrap-entrypoint.md
+    read_before: [bootstrap import, side effect import, prepare recipe environment, dynamic application import, Bun preload, credential initialization ordering]
+  broker_inherited_ipc:
+    path: memories/teleport/broker/broker-inherited-ipc-v1-contract.md
+    read_before: [inherited IPC, Bun IPC, broker envelope, IPC version, request id, secret bootstrap channel, IPC cancellation]
+  broker_consent_and_car_unlock:
+    path: memories/teleport/broker/broker-consent-and-car-unlock.md
+    read_before: [credential prompt, key entry, consent surface, PIN, passphrase, encrypted CAR import, encrypted CAR refresh]
+  broker_sqlite_journal:
+    path: memories/teleport/broker/broker-sqlite-nonsecret-authority-journal.md
+    read_before: [SQLite, bun:sqlite, broker database, grant persistence, consent record, lease journal, recovery journal, replay record, user profile storage]
+  broker_deferred_integration_gates:
+    path: memories/teleport/broker/broker-deferred-console-provider-integration-gates.md
+    read_before: [trusted console host, Windows prompt window, provider selection, first consumer workspace, CLI alias, integration gate]
+  broker_typing_and_fp:
+    path: memories/teleport/broker/broker-typing-fp-implementation-sequence.md
+    read_before: [broker typing, functional composition, Result, TaskResult, branded types, state machines, effect ports, restore executor refactor, three artifact compiler boundaries]
+  broker_fp_enforcement:
+    path: memories/teleport/broker/broker-eslint-flat-config-specification.md
+    read_before: [ESLint, functional lint, strict FP, parser services, boundaries plugin, lint exceptions, Svelte lint, zero warnings]
+  broker_fp_packages:
+    path: memories/teleport/broker/broker-fp-runtime-package-contract.md
+    read_before: [neverthrow, Effect, Remeda, ts-pattern, Zod, fp-ts, FP dependency versions, ResultAsync, Effect Scope]
+  broker_workspace_migration:
+    path: memories/teleport/broker/broker-associated-workspace-hard-migration.md
+    read_before: [JTWC FP migration, wx-ui-melt lint, Supa lint, Deno FP, wx-shells lint, render upstream FP, cross-workspace strictness]
+  broker_domain_algebras:
+    path: memories/teleport/broker/broker-domain-algebra-implementation-sequence.md
+    read_before: [domain algebra, trust states, typed primitives, scope lattice, temporal algebra, authority, reducers, effect commands, broker plans, secret exposure states, codec witnesses, property laws]
+  capability_contracts:
+    path: memories/teleport/contracts/teleport-layer-1-capability-contracts.md
+    read_before: [capability ids, schema versions, instance identity, dependencies, security classes]
+  codec_kernel:
+    path: memories/teleport/contracts/teleport-layer-2-codec-kernel.md
+    read_before: [codec interfaces, canonical encoding, migrations, registry dispatch, decode budgets, conformance]
+  protection_profiles:
+    path: memories/teleport/contracts/teleport-layer-3-protection-profiles.md
+    read_before: [plain export, encrypted export, selective disclosure, recipients, signatures, private inventory, key rotation]
+  cartridge_graph:
+    path: memories/teleport/contracts/teleport-layer-4-cartridge-graph.md
+    read_before: [CAR roots, manifests, blocks, CIDs, graph verification, opaque relay]
+  restore_orchestration:
+    path: memories/teleport/contracts/teleport-layer-5-restore-orchestration.md
+    read_before: [restore plans, authorization, staging, commit, verification, rollback, recovery journals]
+  application_adapters:
+    path: memories/teleport/contracts/teleport-layer-6-application-adapters.md
+    read_before: [JTWC, wx-ui-melt, Supa, Fireproof, provider settings, exact replay, application effects]
+  transport_profiles:
+    path: memories/teleport/contracts/teleport-layer-7-transport-profiles.md
+    read_before: [file transport, streaming, S3, object storage, cloud blocks, mutable heads, retention]
+  cross_project_ownership:
+    path: memories/teleport/contracts/teleport-cross-project-ownership.md
+    read_before: [moving code, changing package boundaries, assigning integration or verification ownership]
+
+guidance:
+  roadmap_changes: format-guidance.md
+  memory_changes: making-memories.md
