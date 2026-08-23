@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "noEmitOnError": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": false,
+    "outDir": "./dist/types",
+    "rootDir": ".",
+    "rewriteRelativeImportExtensions": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["bun"]
+  },
+  "include": [
+    "teleport.ts",
+    "broker-client.ts",
+    "recipe-runner.ts",
+    "broker.ts",
+    "src/teleport/**/*.ts",
+    "src/broker-client/**/*.ts",
+    "src/recipe-runner/**/*.ts",
+    "src/broker/**/*.ts"
+  ],
+  "exclude": ["src/**/*.test.ts", "src/**/__lint_negative__/**"]
+}

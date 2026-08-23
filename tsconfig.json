@@ -1,17 +1,10 @@
 {
-  "compilerOptions": {
-    "target": "ES2023",
-    "lib": ["ES2023", "DOM"],
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "allowImportingTsExtensions": true,
-    "strict": true,
-    "noEmit": true,
-    "exactOptionalPropertyTypes": true,
-    "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true,
-    "skipLibCheck": true,
-    "types": ["node", "vitest/globals"]
-  },
-  "include": ["src/**/*.ts", "vitest*.ts"]
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.teleport.json" },
+    { "path": "./tsconfig.broker-client.json" },
+    { "path": "./tsconfig.recipe-runner.json" },
+    { "path": "./tsconfig.broker.json" },
+    { "path": "./tsconfig.tests.json" }
+  ]
 }

@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "types": ["bun"]
+  },
+  "include": ["broker-client.ts", "src/broker-client/**/*.ts"],
+  "exclude": ["src/**/*.test.ts", "src/**/__lint_negative__/**"]
+}

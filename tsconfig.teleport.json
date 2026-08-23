@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["teleport.ts", "src/teleport/**/*.ts"],
+  "exclude": ["src/**/*.test.ts", "src/**/__lint_negative__/**"]
+}

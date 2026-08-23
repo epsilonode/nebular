@@ -13,7 +13,7 @@ hook: "read before adding, removing, upgrading, importing, or choosing between n
 
 # FP Runtime Package Contract
 
-@dependency Pin `neverthrow` 8.2.0 for portable/client `Result` and `ResultAsync` composition, `remeda` 2.39.0 for selected immutable data pipelines, `ts-pattern` 5.9.0 for exhaustive discriminated-union matching, and `zod` 4.4.3 for ordinary untrusted JSON/CLI/IPC/profile/provider boundaries.
+@dependency Pin `neverthrow` 8.2.0 for portable/client `Result` and `ResultAsync` composition, `remeda` 2.42.0 for selected immutable data pipelines, `ts-pattern` 5.9.0 for exhaustive discriminated-union matching, and `zod` 4.4.3 for ordinary untrusted JSON/CLI/IPC/profile/provider boundaries.
 @dependency Pin Effect 3.22.1 only for privileged `broker.js` structured concurrency, cancellation, queues/deferred coordination, scoped acquisition/finalization, redacted values, retry schedules, and typed service layers.
 @dependency Pin `fast-check` 4.9.0 as a development-only dependency for domain algebra laws and bounded hostile-input generation; it never enters the four runtime artifacts.
 @neverthrow Centralize imports through project façades that define warning-preserving validation, nonempty issues, foreign exception mapping, and public result policy. Use `ResultAsync.fromThrowable` or an equivalent safe thunk wrapper when a foreign promise-returning function may throw synchronously.

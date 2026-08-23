@@ -70,10 +70,16 @@ must_know:
     read_before: [trusted console host, Windows prompt window, provider selection, first consumer workspace, CLI alias, integration gate]
   broker_typing_and_fp:
     path: memories/teleport/broker/broker-typing-fp-implementation-sequence.md
-    read_before: [broker typing, functional composition, Result, TaskResult, branded types, state machines, effect ports, restore executor refactor, three artifact compiler boundaries]
+    read_before: [broker typing, functional composition, Result, TaskResult, branded types, state machines, effect ports, restore executor refactor, four artifact compiler boundaries]
   broker_fp_enforcement:
     path: memories/teleport/broker/broker-eslint-flat-config-specification.md
     read_before: [ESLint, functional lint, strict FP, parser services, boundaries plugin, lint exceptions, Svelte lint, zero warnings]
+  broker_upper_domains:
+    path: memories/teleport/broker/broker-four-upper-level-domains.md
+    read_before: [upper-level domain, four domains, teleport domain, broker client domain, recipe runner domain, broker domain, public surface, cross-domain import]
+  broker_atomic_quality:
+    path: memories/teleport/broker/broker-four-domain-atomic-quality-harness.md
+    read_before: [atomic lint, atomic harness, domain quality gate, check domain, lint domain, typecheck domain, test domain, seam harness, root verify composition]
   broker_fp_packages:
     path: memories/teleport/broker/broker-fp-runtime-package-contract.md
     read_before: [neverthrow, Effect, Remeda, ts-pattern, Zod, fp-ts, FP dependency versions, ResultAsync, Effect Scope]

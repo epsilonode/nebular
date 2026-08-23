@@ -13,7 +13,7 @@ hook: "read before adding or changing ESLint dependencies, flat configuration, t
 
 # ESLint Flat Configuration Specification
 
-@dependency Pin compatible exact dev dependencies in each independently installable workspace: `@eslint/js`, `eslint`, `eslint-plugin-functional`, `eslint-plugin-boundaries`, `globals`, and `typescript-eslint`; add `eslint-plugin-svelte` only in Svelte workspaces. The initial verified baseline is ESLint 10.8.0, functional 10.0.0, boundaries 7.1.0, typescript-eslint 8.65.0, `@eslint/js` 10.0.1, and globals 16.0.0.
+@dependency Pin compatible exact dev dependencies in each independently installable workspace: `@eslint/js`, `eslint`, `eslint-plugin-functional`, `eslint-plugin-boundaries`, `globals`, and `typescript-eslint`; add `eslint-plugin-svelte` only in Svelte workspaces. The Nebular verified baseline is ESLint 10.9.0, functional 10.0.0, boundaries 7.2.0, typescript-eslint 8.67.0, `@eslint/js` 10.0.1, and globals 17.11.0.
 @config Use flat config through `typescript-eslint` config composition. Start with JavaScript recommended, TypeScript recommended, and `recommendedTypeChecked`; set `parserOptions.projectService` and `tsconfigRootDir` so every type-aware functional and TypeScript rule has parser services.
 @config Keep generated output, coverage, package caches, framework output, browser reports, and explicit vendored source ignored. Do not ignore first-party source merely to make lint pass.
 @base Production TypeScript errors include consistent type imports/exports, no explicit any, no floating or misused promises, no non-null assertions, no unnecessary conditions or assertions after migration, no unsafe type assertions outside decoder/registry boundaries, only throwing `Error`, outer-edge `return await`, exhaustive switches, and unused-variable enforcement with a narrow underscore convention.
@@ -27,5 +27,5 @@ hook: "read before adding or changing ESLint dependencies, flat configuration, t
 @avoid Do not enable `prefer-tacit`, functional-parameters, no-expression-statements, or no-conditional-statements. They optimize stylistic purity at the cost of readable security and state-transition code.
 @avoid Do not use deprecated `functional/prefer-readonly-type`; use `functional/prefer-immutable-types` with shallow-readonly enforcement and `functional/type-declaration-immutability`.
 @command Every workspace exposes Mise-routed `lint`, `lint:fix`, and verification tasks. CI-equivalent verification uses zero warnings; auto-fix never runs as part of verification.
+@atomic Nebular exposes scoped `lint:teleport`, `lint:broker-client`, `lint:recipe-runner`, and `lint:broker` tasks. Root lint composes those once plus tooling/configuration lint; it does not redundantly lint the entire production tree before invoking the same domain profiles. The complete lint/typecheck/test/check topology lives in `broker-four-domain-atomic-quality-harness.md`.
 @proof Add configuration fixtures that must fail for direct ambient effects, forbidden import direction, unhandled promise, mutable domain data, thrown expected failure, nonexhaustive state, and privileged import from portable/client code.
-

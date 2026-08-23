@@ -113,6 +113,10 @@
 @accept A secret-bearing managed attempt retains an active secret lease for its process lifetime. Grant expiry or revocation blocks reuse and triggers the recipe's exact safe-stop/delete policy; recipes without a safe termination policy cannot receive an expiring secret lease in V1.
 
 ### @decision @accepted four TypeScript upstream entrypoints
+@memory ../memories/teleport/broker/broker-four-upper-level-domains.md
+@memory ../memories/teleport/broker/broker-four-domain-atomic-quality-harness.md
+@memory ../memories/teleport/contracts/teleport-colocated-domain-seam-vitest.md
+@memory ../memories/teleport/broker/broker-eslint-flat-config-specification.md
 @memory ../memories/teleport/broker/broker-four-artifact-type-boundaries.md
 @memory ../memories/teleport/broker/broker-typescript-project-and-compiler-matrix.md
 @memory ../memories/teleport/broker/broker-import-and-authority-boundary-enforcement.md
@@ -121,6 +125,8 @@
 @accept The canonical upstream prefix is `epsilonode/nebular`, never `wx` or `@wx`; if package-style identity is required, use `@epsilonode/nebular`.
 @accept Each entrypoint is addressable through `https://esm.sh/gh/epsilonode/nebular@<immutable-ref>/<entrypoint>.ts`; production examples and lockfiles pin a release tag or full commit rather than a floating branch.
 @accept Preserve layered TypeScript source behind the four thin public entrypoints. Committing public `.ts` entrypoints does not require collapsing the maintained implementation into four monolithic source files.
+@accept Treat those four deliverables as the V1 upper-level production domains: portable `teleport`, unprivileged `broker-client`, unprivileged `recipe-runner`, and privileged `broker`. Keep finer codec, protection, transport, restore, policy, receiver, and adapter ownership nested inside them until a concrete authority or independent-verification seam warrants another internal domain gate.
+@accept Enforce the acyclic public dependency graph `teleport <- broker-client <- recipe-runner` while allowing `broker` to consume public `teleport` and `broker-client` contracts; `broker` never imports `recipe-runner`, and supporting test/tooling classes never become production domains.
 @accept `teleport.ts` and its generated `.js` mirror contain portable capability contracts, codecs, CAR graph handling, protection, signatures, restore planning, and transport ports; they contain no broker, keychain, consent, process-launching, or provider-refresh implementation.
 @accept `broker-client.ts` and its generated `.js` mirror contain unprivileged versioned IPC contracts and request/grant/lease client behavior; importing either neither accesses `Bun.secrets` nor starts a broker.
 @accept `recipe-runner.ts` is the public unprivileged recipe CLI entrypoint. It parses a recipe for early diagnostics and sends a typed execution request, but it cannot authorize a recipe, retrieve a credential, construct a secret environment, or launch the secret-bearing child.
@@ -148,7 +154,9 @@
 
 ## @tier8 implementation sequence
 
-### @work @active hard FP tooling and fast migration
+### @work @done hard FP tooling and fast migration
+@memory ../memories/teleport/broker/broker-four-upper-level-domains.md
+@memory ../memories/teleport/broker/broker-four-domain-atomic-quality-harness.md
 @memory ../memories/teleport/contracts/teleport-colocated-domain-seam-vitest.md
 @memory ../memories/teleport/broker/broker-hard-fp-enforcement-policy.md
 @memory ../memories/teleport/broker/broker-eslint-flat-config-specification.md
@@ -160,14 +168,17 @@
 @memory ../memories/teleport/broker/broker-fp-verification-and-exception-governance.md
 @memory ../memories/teleport/broker/broker-typing-fp-implementation-sequence.md
 @accept Pin the complete type-aware ESLint, functional, boundaries, TypeScript, and runtime FP dependency set; no security-sensitive dependency uses an unbounded or floating version.
+@evidence `mise.toml`, `package.json`, and `bun.lock` pin Bun 1.4.0, Node 22.23.2, TypeScript 6.0.2, neverthrow 8.2.0, Effect 3.22.1, Remeda 2.42.0, ts-pattern 5.9.0, Zod 4.4.3, fast-check 4.9.0, fast-xml-parser 5.9.3, ESLint 10.9.0, typescript-eslint 8.67.0, functional 10.0.0, boundaries 7.2.0, and `@types/bun` 1.4.0 with exact versions and a frozen lockfile.
+@evidence On 2026-08-23, `mise run verify` passed zero-warning type-aware lint, five isolated compiler projects, 41 test files/189 tests, eight negative lint fixtures, declarations, the isolated package-consumer fixture, exact four-artifact emission, inert imports, credential-literal scans, and authority-graph/path scans. The temporary migration inventory is empty; remaining mechanics exceptions are path-scoped and justified inline in `eslint.config.js`.
 @accept Add self-contained flat-config profiles and negative lint fixtures before migrating source, including parser services and explicit pure/adapter/Svelte/test/tooling ownership.
 @accept Split compiler projects and ambient types before broker adapters land; add exact artifact import topology and default-disallow dependency policies.
 @accept Give every Broker domain a named conservative Vitest project with colocated atomic tests; reserve `.seam.test.ts` for precise public-boundary composition and `.live.test.ts` for explicit host-dependent proof.
+@accept Give each of the four upper-level domains `lint:<domain>`, `typecheck:<domain>`, `test:<domain>`, and composed `check:<domain>` commands. Root verification composes them in dependency order, then runs seam and artifact conformance; shared lint rules execute through scoped domain gates without redundantly linting all production source first.
+@accept Treat current `kernel` and `restore` test projects as transitional partitions of `teleport`. Preserve their evidence until domain directories and public surfaces exist, then consolidate their test ownership under `test:teleport`; retain `configuration`, `seam`, and opt-in `live` as supporting harness classes.
 @accept Migrate result/error composition, identifiers, codecs, state machines, restore execution, and effect ports in the linked dependency order, removing old expected-failure APIs in the same bounded slice.
 @accept Complete each associated workspace independently from the specifications here; do not import or point at an external project's configuration as the implementation contract.
-@proof_gap No ESLint configuration, separate compiler projects, pinned FP runtime dependencies, negative enforcement fixtures, or hard-migration baseline exists yet in this workspace.
 
-### @work @active strengthen typing and functional boundaries
+### @work @partial strengthen typing and functional boundaries
 @memory ../memories/teleport/broker/broker-domain-types-and-boundary-parsing.md
 @memory ../memories/teleport/broker/broker-result-task-result-and-error-algebra.md
 @memory ../memories/teleport/broker/broker-codec-adt-and-registry-boundary.md
@@ -187,9 +198,10 @@
 @accept Keep pure policy, planning, codec, migration, and state-transition functions separate from explicit clock, entropy, crypto, keychain, consent, audit, IPC, process, provider, filesystem, and journal ports.
 @accept Replace unstructured restore stage/receipt tokens and exception control flow with typed handlers, direct task-result composition, cancellation, and explicit rollback, cleanup, and recovery-required outcomes.
 @accept Enforce portable, client, runner, and privileged authority through separate compiler projects and import graphs in addition to the four output entrypoints.
-@proof_gap The current strict compiler settings are valuable, but primitive identifiers, optional codec/port combinations, registry casts, ambient effects, unstructured restore tokens, thrown issue arrays, and discarded cleanup/rollback failures remain refactor targets.
+@evidence The four domains now own constructed primitives, nonempty typed issue channels, closed IPC/recipe/bootstrap decoders, immutable codec/protection/transport/restore plans, sealed consent/grant states, explicit runtime ports, callback-scoped secret leases, and a broker-only Result-to-Effect/finalization boundary with redacted Exit projection.
+@proof_gap Provider-indexed vocabularies, compile-negative illegal trust/authority/exposure states, additional warning/report combination laws, and any remaining legacy Teleport result conventions still require focused admission rather than repository-wide mechanical rewrites.
 
-### @work @active expand domain algebras and lawful composition
+### @work @partial expand domain algebras and lawful composition
 @memory ../memories/teleport/broker/broker-trust-state-transition-algebra.md
 @memory ../memories/teleport/broker/broker-scope-and-authority-lattice.md
 @memory ../memories/teleport/broker/broker-temporal-authority-algebra.md
@@ -215,9 +227,10 @@
 @accept Represent secret reference, encrypted bytes, scoped plaintext, operation handle, and lease identity as incompatible exposure states; plaintext exists only inside an authorized scoped interpreter operation.
 @accept Strengthen codecs with typed witnesses and typed encoded blocks while separating migration, dependency, restore planning, and effects; confine unavoidable generic erasure to registries.
 @accept Add property-law tests with pinned fast-check, compile-negative fixtures, and algebra-ownership lint. Do not add optics unless measured nested immutable update pressure satisfies the linked adoption gate.
-@proof_gap These domain algebras, laws, type-state transitions, reducer/effect commands, secret exposure states, codec witnesses, and ownership lint do not yet exist in implementation.
+@evidence Pure authority request/grant reducers now emit closed consent/journal effects, audit facts, warnings, and terminal projections; lease states separate reference/authorization/plaintext exposure; receiver plans and observations are closed; secret-transfer plans separate portable facts from destination authority; bounded fast-check laws prove set-order invariance, strict widening rejection, and exclusive expiry.
+@proof_gap Provider-indexed scope registries, general plan/report combination algebras, broader generated codec/replay/reducer laws, and compile-negative type-state fixtures remain open. Optics remain deliberately unadopted because no measured pressure justifies them.
 
-### @work @active define closed broker contracts and threat model
+### @work @partial define closed broker contracts and threat model
 @memory ../memories/teleport/broker/broker-domain-types-and-boundary-parsing.md
 @memory ../memories/teleport/broker/broker-result-task-result-and-error-algebra.md
 @memory ../memories/teleport/broker/broker-request-grant-transfer-state-machines.md
@@ -228,9 +241,11 @@
 @accept Document protected assets, trust boundaries, same-user limitations, process inheritance behavior, clipboard prohibition, memory lifetime, logging/redaction rules, and recovery behavior after broker or client termination.
 @accept Separate local grant expiry, secret lease expiry, provider-token expiry, and refresh authority; never infer one from another.
 @accept Version broker IPC and persisted nonsecret metadata independently from Teleport capability schemas.
-@proof_gap No broker packages, privileged process, or threat-model conformance suite exist yet in this workspace.
+@evidence Broker/client contracts now cover versioned control and secret-bootstrap IPC, repository/recipe grants, consent evidence, leases, revocation/expiry, nonsecret journal records, receiver lifecycle/observation, secret delivery, and encrypted-transfer replay/transaction outcomes. Security seams reject path/revision/slot drift, mismatched attempts, expired authority, replay, recipient/signature failures, and secret-bearing diagnostics.
+@proof_gap Provider renewal, trusted-console identity/spoofing proof, same-user IPC impersonation analysis, DLL/module/clipboard/crash-dump limits, and end-to-end hostile-process tests remain open.
 
-### @work @ready implement OS-backed vault and local broker
+### @work @partial implement OS-backed vault and local broker
+@memory ../memories/teleport/broker/broker-bun-1-4-runtime-capabilities.md
 @memory ../memories/teleport/broker/broker-secret-values-and-lifetime.md
 @memory ../memories/teleport/broker/broker-explicit-effect-environment.md
 @memory ../memories/teleport/broker/broker-capability-specific-ports.md
@@ -238,14 +253,15 @@
 @memory ../memories/teleport/broker/broker-inherited-ipc-v1-contract.md
 @memory ../memories/teleport/broker/broker-host-owned-pm2-prerequisite.md
 @memory ../memories/teleport/broker/broker-windows-process-tree-conformance.md
-@blocker Complete the closed contracts and prove inherited Bun IPC, already-running PM2 preflight/direct materialization, external observation, cooperative credential bootstrap, and Windows exact-tree cleanup. Final package bin aliases are a packaging decision and do not block domain or broker-core implementation.
+@blocker Complete the delegated host-owned PM2 one-shot receiver, Windows exact-tree cleanup, and a real broker-side cooperative-bootstrap adapter. Trusted prompt/provider workflows and final package aliases remain separate broker composition work.
+@evidence `Bun.secrets` is confined behind broker-owned callback-scoped read/write ports; the Bun 1.4.0 Windows live harness proves replace/read/delete/missing cleanup against the real OS keychain. The versioned Bun SQLite adapter proves ten real transactional cases including consent+grant atomicity, CAS leases, replay, corruption, lock bounds, trusted profile paths, and connection cleanup. Built broker control over inherited Bun IPC flushes a terminal frame and exits without a resident helper.
 @accept Run broker control as short-lived Bun child processes over inherited IPC. Do not start a local HTTP server, open a TCP listener, or require singleton endpoint discovery in V1.
 @accept Implement create, resolve, lease, revoke, expire, enumerate-redacted, and rotate-reference operations through the broker-owned `SecretStore` port backed initially by `Bun.secrets`.
 @accept Derive stable, collision-resistant Bun `service` and `name` identifiers from the broker namespace and opaque credential reference; keep provider, project, scope, and expiry metadata outside the secret value and never use secret content as an identifier.
 @accept Keep secret bytes inside the broker except during an explicitly authorized delivery operation; zero or release buffers as promptly as the runtime permits.
 @accept Implement the journal initially with pinned Bun `bun:sqlite`, explicit schema migrations, transactional state/event writes, bounded lock waits, current-user filesystem protection, and typed recovery for interrupted consent, keychain mutation, rotation, revocation, renewal, CAR replay commits, and process-attempt transitions.
 
-### @work @ready build trusted key-entry and CAR-unlock UI plus minimal CLI
+### @work @blocked build trusted key-entry and CAR-unlock UI plus minimal CLI
 @memory ../memories/teleport/broker/broker-deferred-console-provider-integration-gates.md
 @blocker Local broker and IPC authentication must exist first.
 @accept The CLI supports `request`, `run`, `status`, `revoke`, and `doctor` flows and opens a separate broker-owned console for masked key entry or encrypted-CAR PIN/passphrase entry. Ordinary existing authorized recipe runs do not display a second approval prompt.
@@ -253,7 +269,7 @@
 @accept Consent prompts resist request spoofing by displaying broker-derived executable and canonical project identity rather than trusting caller-provided labels alone.
 @accept Cancellation, timeout, denial, expired grants, unavailable keychain, scope mismatch, and provider-authentication failure return distinct redacted diagnostics.
 
-### @work @ready add child-process and JS/TS clients
+### @work @partial add child-process and JS/TS clients
 @memory ../memories/teleport/broker/broker-request-grant-transfer-state-machines.md
 @memory ../memories/teleport/broker/broker-secret-values-and-lifetime.md
 @memory ../memories/teleport/broker/broker-git-recipe-command-authority.md
@@ -265,7 +281,8 @@
 @memory ../memories/teleport/broker/broker-receiver-secret-delivery.md
 @memory ../memories/teleport/broker/broker-inherited-ipc-v1-contract.md
 @memory ../memories/teleport/broker/broker-cooperative-bootstrap-entrypoint.md
-@blocker Consent and lease semantics must be stable.
+@blocker The real secret-bearing Bun inherited-IPC/process-environment leaf and admitted PM2 receiver must exist before this slice can prove a managed application launch.
+@evidence `broker-client` now has bounded ordinary control IPC, one-request inherited-Bun transport, a distinct closed secret-bootstrap protocol, atomic environment-patch planning, deferred application import, callback-opaque secret values, and grant-to-lease-to-bootstrap seams. Import remains inert and cannot access `Bun.secrets` or privileged broker modules.
 @accept `recipe-runner.js` requests one checked-in Git-scoped recipe; one-shot broker control validates authority and materializes the requested command directly in PM2. A cooperative target bootstrap obtains declared credentials through a short-lived private broker exchange inside the managed process; no parent environment rewrite, `.env` file, or resident wrapper is introduced.
 @accept The JS/TS package exposes request and scoped-operation APIs; raw-token access requires an explicit elevated method and policy approval.
 @accept Clients reconnect safely, handle broker upgrades and lease expiry, and never cache secrets beyond the authorized operation lifetime.
@@ -278,6 +295,7 @@
 @memory ../memories/teleport/broker/broker-recipe-parity-provenance-and-cutover.md
 @memory ../memories/teleport/broker/broker-recipe-v1-wire-revision-contract.md
 @meta name=delegated-dev-target content="../../../../pk/proj-ledger/roadmaps/recipes.md#universal-pm2-receiver-and-reusable-one-shot-slots"
+@evidence A read-only audit of `R:/Code/pk` at `c5f013a46a6455b6b464a22d80a8e567df6a3785` found the reusable PM2 one-shot target still roadmap-only: no host-no-daemon adapter, slot allocation/locking/revalidation, stale-handle reconciliation, output-generation reset, caller-death handling, or Windows tree-cleanup proof exists to admit or transplant.
 @blocker Continue only the generic universal PM2 receiver and reusable one-shot-slot implementation in Bake at the delegated dev target; do not duplicate that substrate in wx-teleport-cartridge.
 @blocker Complete the broker recipe-domain contracts and record an explicit admission matrix against implemented Bake source/tests before copying code. Bake roadmap prose, temporary package façades, planned built-ins, and unproved lifecycle behavior are not extraction evidence.
 @note Broker remains authoritative for FP architecture, domain algebras, credential authority, secret delivery, CAR integration, four-artifact packaging, and final conformance. When Bake closes the delegated target with evidence, return here for admission, transplant, and local cutover.
@@ -285,12 +303,12 @@
 @accept Transplant admitted TypeScript source and fixtures into locally owned modules, sever all Bake imports and filesystem pointers, apply the strict FP/domain boundaries, and bundle from local entrypoints. Do not publish or consume a compiled Bake compatibility artifact as an intermediate architecture.
 @proof_gap Differential fixtures must prove decoding, normalization, argv resolution, lifecycle/status reduction, redaction, and rejected-field behavior before cutover. Build proofs must show no `R:/Code/pk`, `@bake/*`, Bake alias, source fallback, or undeclared shared chunk in runtime artifacts or declarations.
 
-### @work @ready establish four-entrypoint public upstream and builds
+### @work @partial establish four-entrypoint public upstream and builds
 @memory ../memories/teleport/broker/broker-four-artifact-type-boundaries.md
 @memory ../memories/teleport/broker/broker-typing-fp-implementation-sequence.md
 @memory ../memories/teleport/broker/broker-epsilonode-nebular-esm-distribution.md
-@blocker Credential contracts and broker/client module boundaries must exist before freezing distribution entrypoints.
-@blocker The public repository does not exist and this local repository has no configured Git remote; repository creation, default branch, release signing, and first immutable ref remain packaging work.
+@blocker Commit the current verified source, establish the first immutable public ref, prove all four esm.sh URLs at that same ref, and finish the intended CLI/bin surfaces before calling distribution complete.
+@evidence GitHub reports `https://github.com/epsilonode/nebular` as PUBLIC with default branch `main`, matching the configured `origin` and package identity `@epsilonode/nebular`. Four thin root `.ts` entrypoints, conditional package exports, separate declarations, Mise/Bun builds with splitting disabled, and graph verification exist. `mise run verify` emits exactly `teleport.js`, `broker-client.js`, `recipe-runner.js`, and `broker.js`, resolves all four subpaths through an isolated consumer, and rejects any fifth export, undeclared chunk, privileged edge, old workspace pointer, absolute source path, or credential-shaped literal.
 @accept Add root TypeScript entrypoints `teleport.ts`, `broker-client.ts`, `recipe-runner.ts`, and `broker.ts`; internal modules remain layered and are not individually exposed as stable esm.sh paths.
 @accept Add Mise-managed Bun build tasks for the portable artifact, broker artifacts, complete distribution, and distribution verification. No build or package command bypasses Mise.
 @accept Build `teleport.js` with the portable/browser-compatible target required by existing consumers and build `broker-client.js`, `recipe-runner.js`, and `broker.js` for the pinned Bun runtime.
@@ -319,12 +337,15 @@
 @accept Importing a cartridge may start a broker consent flow but cannot bypass local policy, user verification, project binding, expiry, or provider authentication.
 @accept Keep recipient-encrypted `secret-transfer` separate, opt-in, short-lived, replay-aware, and interactively imported. It is not required for ordinary local development.
 
-### @work @ready implement encrypted credential CAR export and import
+### @work @partial implement encrypted credential CAR export and import
 @memory ../memories/teleport/broker/broker-codec-adt-and-registry-boundary.md
+@memory ../memories/teleport/broker/broker-consent-and-car-unlock.md
 @memory ../memories/teleport/broker/broker-typed-restore-effects-and-recovery.md
 @memory ../memories/teleport/broker/broker-request-grant-transfer-state-machines.md
 @memory ../memories/teleport/broker/broker-secret-values-and-lifetime.md
-@blocker Broker contracts, `SecretStore`, recipient protection, signatures, and consent flows must be stable.
+@blocker A trusted import/export CLI and staged pre-unlock preview contract must close before this capability is user-operable.
+@evidence `dev.credential.secret-transfer@1` now has a closed budgeted codec, portable-fact and destination-authority separation, recipient protection, trusted signatures, private-inventory wrapping, replay/expiry/scope/conflict policy, callback-scoped export plaintext, transaction-scoped import plaintext, explicit elevated replacement consent, and redacted committed/recovery receipts. Atomic and real WebCrypto/CAR seam tests cover success, replay, wrong recipient, untrusted signer, expiry, modification, and transactional recovery.
+@proof_gap The current private-inventory wrapper conceals provider/account/scope/expiry facts until unlock. The accepted flow requires those facts to be authenticated and displayed before PIN/passphrase entry acts as consent; add a signed/cross-bound nonsecret preview or staged locator contract without exposing provider secrets or local project authority.
 @accept Add dedicated broker CLI flows for encrypted export and import; require an explicit credential selection, intended recipient, transfer expiry, and confirmation rather than exporting all available credentials implicitly.
 @accept Export obtains the selected secret through an authorized short lease, encodes the closed secret-transfer capability, protects it for the intended recipient, signs according to policy, writes the CAR, and releases plaintext buffers.
 @accept Import performs verification and decryption in an isolated staging flow, rejects expired or previously consumed transfer ids, displays the exact provider, account, kind, scopes, destination repository, and recipe in the broker-owned prompt, and does not mutate the keychain until successful PIN/passphrase unlock.
@@ -334,12 +355,14 @@
 
 ## @tier7 verification and rollout
 
-### @proof @open security and lifecycle conformance
+### @proof @partial security and lifecycle conformance
 @memory ../memories/teleport/broker/broker-result-task-result-and-error-algebra.md
 @memory ../memories/teleport/broker/broker-typed-restore-effects-and-recovery.md
 @memory ../memories/teleport/broker/broker-secret-values-and-lifetime.md
 @memory ../memories/teleport/broker/broker-typing-fp-implementation-sequence.md
 @memory ../memories/teleport/broker/broker-fp-verification-and-exception-governance.md
+@evidence Windows Bun 1.4.0 live proof covers ten real SQLite cases, real OS-keychain replace/read/delete/missing cleanup, terminal-plus-helper-exit inherited IPC, and built runner-to-broker control. Default seams cover authority drift, lease exposure, redacted failures, encrypted-transfer recipient/signature/replay/expiry/modification failures, and transactional recovery; artifact scans reject credential-shaped literals and absolute workspace paths.
+@proof_gap Keychain lock/unavailable and platform size limits, restart recovery, trusted key-entry cancellation, private-inventory PIN failure, provider refresh, hostile same-user IPC/process cases, exact managed-child inheritance, PM2 tree cleanup, and proof on macOS/Linux remain open.
 @accept Prove secrets do not appear in CLI arguments, parent environments, repository scans, persisted metadata, standard logs, denial diagnostics, audit events, or Teleport requirement cartridges.
 @accept Pin and record the tested Bun version, then prove real `Bun.secrets` persistence, replacement, deletion, missing-entry behavior, user scoping, platform size limits, locked or unavailable keychain behavior, and failure redaction on every supported OS.
 @accept Prove restart recovery, expiration, revocation, scope mismatch, canonical-path mismatch, process termination, key-entry cancellation, failed CAR PIN/passphrase unlock, and provider refresh failure.
@@ -354,12 +377,16 @@
 @accept Prove an agent can request authorization, the user can enter or approve a credential entirely outside chat, and the authorized Mise task completes without the raw key appearing in the conversation or repository.
 @accept Document installation, broker startup, trusted prompt identity, grant inspection, revocation, provider recovery, and removal in lightweight tiered-routing guidance.
 
-### @proof @open four-artifact distribution conformance
+### @proof @partial four-artifact distribution conformance
+@memory ../memories/teleport/broker/broker-four-upper-level-domains.md
+@memory ../memories/teleport/broker/broker-four-domain-atomic-quality-harness.md
 @memory ../memories/teleport/broker/broker-four-artifact-type-boundaries.md
 @memory ../memories/teleport/broker/broker-typing-fp-implementation-sequence.md
 @memory ../memories/teleport/broker/broker-typescript-project-and-compiler-matrix.md
 @memory ../memories/teleport/broker/broker-import-and-authority-boundary-enforcement.md
 @memory ../memories/teleport/broker/broker-epsilonode-nebular-esm-distribution.md
+@evidence Local `mise run verify` proves exactly four package exports and runtime `.js` files, four root declaration entries, no shared chunks, the acyclic authority graph, portable/client/runner exclusions, inert imports, no old workspace pointers or absolute source paths, and all subpath declarations through an isolated consumer fixture.
+@proof_gap Commit and push the current verified tree, create an immutable tag/ref, resolve all four esm.sh source URLs at that one ref, run the real browser golden vector, and prove installed artifacts without workspace source fallback before closing distribution.
 @accept Prove a public immutable `epsilonode/nebular` ref serves all four committed TypeScript entrypoints through esm.sh and that every resolved module stays within the same repository/ref and allowed dependency graph.
 @accept Prove the committed public surface contains exactly the four root TypeScript entrypoints and no accidental fifth public path; separately prove a clean optional build emits exactly their four `.js` mirrors with no shared chunks, hidden runtime dependencies, or native executable.
 @accept Prove the immutable esm.sh forms of `teleport.ts` and `broker-client.ts` load in their supported unprivileged environments, and prove the pinned `recipe-runner.ts` and `broker.ts` delivery paths preserve their Bun/runtime and authority constraints.
@@ -370,7 +397,9 @@
 @accept Install the built package into isolated consumer fixtures and prove all four package subpath exports plus declaration resolution without falling back to workspace source files.
 @accept Scan the four artifacts, declarations, optional maps, build logs, and fixtures for embedded credentials and reject unexpected absolute workspace paths or secret-bearing literals.
 
-### @proof @open FP and tooling conformance
+### @proof @partial FP and tooling conformance
+@memory ../memories/teleport/broker/broker-four-upper-level-domains.md
+@memory ../memories/teleport/broker/broker-four-domain-atomic-quality-harness.md
 @memory ../memories/teleport/contracts/teleport-colocated-domain-seam-vitest.md
 @memory ../memories/teleport/broker/broker-eslint-flat-config-specification.md
 @memory ../memories/teleport/broker/broker-typescript-project-and-compiler-matrix.md
@@ -381,6 +410,8 @@
 @memory ../memories/teleport/broker/broker-property-and-type-proof-strategy.md
 @memory ../memories/teleport/broker/broker-algebra-ownership-lint-contract.md
 @memory ../memories/teleport/broker/broker-domain-algebra-implementation-sequence.md
+@evidence `mise run verify` passes zero warnings, five compiler projects, 41 deterministic test files/189 tests, eight deliberate lint failures, test inventory classification, package declarations, and artifact checks. The broker-only Effect suite proves Result conversion, finalization on success/typed failure/interruption, defect separation, cancellation projection, and redaction. Bounded fast-check authority laws run in the broker atomic project.
+@proof_gap Add compile-negative illegal trust/authority/exposure fixtures, broader warning/Result/reducer/replay/codec laws, explicit adapter-exception inventory output, and bounded performance/streaming measurements before closing the full FP proof target.
 @accept Prove type-aware lint actually executes every configured rule, emits zero warnings, and rejects negative fixtures for mutation, ambient effects, promise misuse, nonexhaustive state, expected-failure throws, and forbidden import direction.
 @accept Prove all compiler projects independently pass with their minimal ambient types and isolated consumer fixtures resolve all public declarations without source aliases or privileged leakage.
 @accept Prove named atomic projects, cross-domain seam projects, and opt-in live projects select each test exactly once and preserve conservative deterministic execution.
