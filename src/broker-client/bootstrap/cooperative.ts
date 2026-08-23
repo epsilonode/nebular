@@ -17,6 +17,7 @@ import {
 import {
   clientErr,
   clientOk,
+  type BrokerClientIssues,
   type BrokerClientResult
 } from '../result.ts';
 
@@ -53,9 +54,15 @@ export type BootstrapEnvironmentPatch = Readonly<{
   entries: readonly BootstrapEnvironmentPatchEntry[];
 }>;
 
+export type BootstrapEnvironmentRollbackPort = Readonly<{
+  rollback: () => Promise<BrokerClientResult<void>>;
+}>;
+
 export type BootstrapEnvironmentInstallReceipt = Readonly<{
   atomic: boolean;
   installedSlots: readonly BootstrapSlotDeclaration[];
+  /** Capability for removing installed names after a post-install failure. */
+  cleanup: BootstrapEnvironmentRollbackPort;
 }>;
 
 export type BootstrapEnvironmentInstallPort = Readonly<{
@@ -68,6 +75,8 @@ export type BootstrapEnvironmentInstallPort = Readonly<{
 export type BootstrapExchangeCompletion<T> = Readonly<{
   acknowledgement: BootstrapAcknowledgementMessage;
   value: T;
+  /** Transport invokes this if the helper does not commit and exit cleanly. */
+  cleanup: BootstrapEnvironmentRollbackPort;
 }>;
 
 export type CooperativeBootstrapTransportPort = Readonly<{
@@ -227,8 +236,24 @@ const validateInstallReceipt = (
     ? clientOk(receipt)
     : clientErr({
         code: 'environment-invalid',
-        message: 'Atomic environment installer returned inconsistent redacted receipt facts.'
-      });
+      message: 'Atomic environment installer returned inconsistent redacted receipt facts.'
+    });
+
+const failAfterEnvironmentRollback = <Value>(
+  receipt: BootstrapEnvironmentInstallReceipt,
+  issues: BrokerClientIssues
+): Promise<BrokerClientResult<Value>> => receipt.cleanup.rollback().then(
+  rolledBack => rolledBack.isOk()
+    ? clientErr(...issues)
+    : clientErr({
+        code: 'environment-invalid',
+        message: 'Bootstrap failed after installation and environment rollback did not complete.'
+      }),
+  () => clientErr({
+    code: 'environment-invalid',
+    message: 'Bootstrap failed after installation and environment rollback did not complete.'
+  })
+);
 
 const preparedEnvironment = (
   request: BootstrapRequestMessage,
@@ -285,29 +310,49 @@ const prepareDelivery = (
   );
   if (planned.isErr()) return Promise.resolve(clientErr(planned.error[0], ...planned.error.slice(1)));
   const patch = planned.value;
-  return ports.environment.installAtomically(patch).then(installed =>
-    installed.andThen(receipt => validateInstallReceipt(patch, receipt)).andThen(() =>
-      createBootstrapAcknowledgement({
-        exchangeId: patch.exchangeId,
-        leaseId: patch.leaseId,
-        processAttemptId: patch.processAttemptId,
-        installedSlotIds: patch.slots.map(slot => slot.slotId)
-      }).map(acknowledgement => ({
-        acknowledgement,
-        value: preparedEnvironment(input.request, patch)
-      }))
-    )
-  );
+  return ports.environment.installAtomically(patch).then(installed => {
+    if (installed.isErr()) return clientErr(installed.error[0], ...installed.error.slice(1));
+    const receipt = installed.value;
+    const validated = validateInstallReceipt(patch, receipt);
+    if (validated.isErr()) {
+      return failAfterEnvironmentRollback<BootstrapExchangeCompletion<PreparedRecipeEnvironment>>(
+        receipt,
+        [validated.error[0], ...validated.error.slice(1)]
+      );
+    }
+    const acknowledgement = createBootstrapAcknowledgement({
+      exchangeId: patch.exchangeId,
+      leaseId: patch.leaseId,
+      processAttemptId: patch.processAttemptId,
+      installedSlotIds: patch.slots.map(slot => slot.slotId)
+    });
+    return acknowledgement.isErr()
+      ? failAfterEnvironmentRollback<BootstrapExchangeCompletion<PreparedRecipeEnvironment>>(
+          receipt,
+          [acknowledgement.error[0], ...acknowledgement.error.slice(1)]
+        )
+      : clientOk({
+          acknowledgement: acknowledgement.value,
+          value: preparedEnvironment(input.request, patch),
+          cleanup: receipt.cleanup
+        });
+  });
 };
+
+const prepareRecipeEnvironmentExchange = (
+  input: PrepareRecipeEnvironmentInput,
+  ports: CooperativeBootstrapPorts
+): Promise<BrokerClientResult<BootstrapExchangeCompletion<PreparedRecipeEnvironment>>> =>
+  ports.transport.exchange(
+    input.request,
+    response => prepareDelivery(input, response, ports)
+  );
 
 export const prepareRecipeEnvironment = (
   input: PrepareRecipeEnvironmentInput,
   ports: CooperativeBootstrapPorts
 ): Promise<BrokerClientResult<PreparedRecipeEnvironment>> =>
-  ports.transport.exchange(
-    input.request,
-    response => prepareDelivery(input, response, ports)
-  ).then(result => result.map(completion => completion.value));
+  prepareRecipeEnvironmentExchange(input, ports).then(result => result.map(completion => completion.value));
 
 const loadDeferredApplication = <Module>(
   deferredImport: () => PromiseLike<Module>
@@ -326,9 +371,18 @@ export const prepareRecipeEnvironmentThenImport = <Module>(
   ports: CooperativeBootstrapPorts,
   deferredImport: () => PromiseLike<Module>
 ): Promise<BrokerClientResult<PreparedApplication<Module>>> =>
-  prepareRecipeEnvironment(input, ports).then(prepared => prepared.isErr()
+  prepareRecipeEnvironmentExchange(input, ports).then(prepared => prepared.isErr()
     ? clientErr(prepared.error[0], ...prepared.error.slice(1))
-    : loadDeferredApplication(deferredImport).then(application => application.map(value => ({
-        environment: prepared.value,
-        application: value
-      }))));
+    : loadDeferredApplication(deferredImport).then(application => application.isOk()
+      ? clientOk({
+          environment: prepared.value.value,
+          application: application.value
+        })
+      : failAfterEnvironmentRollback<PreparedApplication<Module>>(
+          {
+            atomic: true,
+            installedSlots: prepared.value.value.installedSlots,
+            cleanup: prepared.value.cleanup
+          },
+          [application.error[0], ...application.error.slice(1)]
+        )));

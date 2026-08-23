@@ -132,6 +132,21 @@ artifactSources.forEach((source, index) => {
   }
 });
 
+const forbiddenAuthorityLiterals: Readonly<Record<EntrypointName, readonly RegExp[]>> = {
+  teleport: [/\bBun\./u, /\bbun:/u, /\bnode:/u, /Bun\.secrets/u, /bun:sqlite/u],
+  'broker-client': [/Bun\.secrets/u, /bun:sqlite/u, /createBunSecretStore/u, /createBunSqliteAuthorityJournal/u],
+  'recipe-runner': [/Bun\.secrets/u, /bun:sqlite/u, /createBunSecretStore/u, /createBunSqliteAuthorityJournal/u],
+  broker: []
+};
+artifactSources.forEach((source, index) => {
+  const entrypoint = entrypointNames[index];
+  if (entrypoint === undefined) throw new Error('Artifact inventory and source inventory are inconsistent.');
+  const forbidden = forbiddenAuthorityLiterals[entrypoint].find(pattern => pattern.test(source));
+  if (forbidden !== undefined) {
+    throw new Error(`${entrypoint} artifact contains forbidden authority literal ${forbidden.source}.`);
+  }
+});
+
 const declarationSources = await Promise.all(entrypointNames.map(name =>
   readFile(resolve(declarationDirectory, `${name}.d.ts`), 'utf8')
 ));

@@ -139,7 +139,11 @@ describe('repository grant to cooperative bootstrap seam', () => {
           patch.entries.forEach(entry => entry.secret.withValue(value => {
             observedInsideInstaller = value === canary;
           }));
-          return clientOk({ atomic: true, installedSlots: patch.slots });
+          return clientOk({
+            atomic: true,
+            installedSlots: patch.slots,
+            cleanup: { rollback: () => Promise.resolve(clientOk(undefined)) }
+          });
         })())
       }
     };

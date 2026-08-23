@@ -22,5 +22,5 @@
     "src/recipe-runner/**/*.ts",
     "src/broker/**/*.ts"
   ],
-  "exclude": ["src/**/*.test.ts", "src/**/__lint_negative__/**"]
+  "exclude": ["src/**/*.test.ts", "src/**/__lint_negative__/**", "src/**/__type_negative__/**"]
 }

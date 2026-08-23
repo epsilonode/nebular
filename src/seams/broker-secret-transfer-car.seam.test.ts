@@ -27,13 +27,16 @@ import {
   parseRecipeRevision
 } from '../broker/primitives.ts';
 import {
-  SECRET_TRANSFER_CAPABILITY_ID,
   secretTransferErr,
   secretTransferOk,
   type AuthorizedSecretTransferDestination,
   type SecretTransferDestinationRequest,
   type SecretTransferPortableFacts
 } from '../broker/secret-transfer.ts';
+import {
+  SECRET_TRANSFER_INVENTORY_CAPABILITY_ID,
+  SECRET_TRANSFER_PREVIEW_CAPABILITY_ID
+} from '../broker/secret-transfer-preview.ts';
 
 const PASSPHRASE = 'test-only-private-inventory-passphrase';
 const SECRET_CANARY = 'SECRET_TRANSFER_CANARY_NOT_FOR_RECEIPTS';
@@ -296,9 +299,12 @@ describe('broker encrypted secret-transfer CAR seam', () => {
     if (exported.type === 'err') return;
     const publicArchiveText = new TextDecoder().decode(exported.value.cartridge.bytes);
     expect(publicArchiveText).not.toContain(SECRET_CANARY);
-    expect(publicArchiveText).not.toContain(SECRET_TRANSFER_CAPABILITY_ID);
-    expect(publicArchiveText).not.toContain('weather-provider');
+    expect(publicArchiveText).toContain(SECRET_TRANSFER_PREVIEW_CAPABILITY_ID);
+    expect(publicArchiveText).toContain(SECRET_TRANSFER_INVENTORY_CAPABILITY_ID);
+    expect(publicArchiveText).toContain('weather-provider');
+    expect(publicArchiveText).toContain('forecast:read');
     expect(publicArchiveText).not.toContain('account-secret-identity');
+    expect(publicArchiveText).not.toContain('Private weather account');
     expect(JSON.stringify(exported.value.receipt)).not.toContain(SECRET_CANARY);
     expect(ports.inspect()).toMatchObject({ sourceReleased: true });
 
@@ -333,8 +339,8 @@ describe('broker encrypted secret-transfer CAR seam', () => {
       { type: 'source-opened' },
       { type: 'source-released' },
       { type: 'replay-checked' },
-      { type: 'authority-checked' },
       { type: 'conflict-checked' },
+      { type: 'authority-checked' },
       { type: 'transaction-opened' },
       { type: 'secret-installed' },
       { type: 'transaction-closed' }
@@ -400,7 +406,7 @@ describe('broker encrypted secret-transfer CAR seam', () => {
       cartridgeBytes: modified
     }, ports.importPorts)).toMatchObject({
       type: 'err',
-      issues: [{ code: 'private-inventory-rejected' }]
+      issues: [{ code: 'car-invalid' }]
     });
     expect(ports.inspect().events).not.toContainEqual({ type: 'transaction-opened' });
   });

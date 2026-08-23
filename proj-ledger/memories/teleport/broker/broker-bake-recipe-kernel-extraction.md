@@ -20,6 +20,13 @@ hook: "read before continuing recipe work in Bake, extracting @bake/recipe, copy
 @current `R:/Code/pk/packages/recipe` is a private temporary façade whose entrypoint re-exports root `src/recipes/**`. Its README records unresolved coupling to Bake XML parsing, Zod schemas, built-in duration/registry behavior, evaluator logic, and temporal behavior. Do not mistake the façade for an extracted package boundary.
 @why Continue generic work in Bake only while its existing tests, recipes, PM2 lifecycle implementation, and operational environment are the fastest place to prove behavior. Stop adding behavior there when it is broker-specific or when maintaining two implementations would create semantic drift.
 
+## Portable one-shot receiver kernel
+
+@kernel The current admitted candidate surface is `src/process-runner/one-shot-slots.ts` plus `one-shot-receiver.ts`: fixed stable slot identities, typed ownership metadata, serialized allocation port, empty-or-confirmed-terminal reuse, namespace/conflict outcomes, generation-bound attempt handles, stale-handle rejection, bounded output cursors, expired-attempt reconciliation plans, and exact-name PM2 effect ports.
+@responsibility The kernel accepts an opaque already-admitted launch payload and deliberately does not duplicate Git, recipe, broker grant, credential, or consent authority. It does not spawn directly, manage the PM2 daemon, retain invocation history, or claim cleanup when the receiver reports `unconfirmed` containment.
+@proof_boundary Collocated atomic tests cover slot identity/inventory/allocation/conflict/stale-handle/reconciliation laws; seam tests cover serialized exact-name orchestration, metadata confirmation, output attribution and bounds, and fail-closed cleanup state. This proves a portable policy kernel, not a production receiver.
+@remaining A production Bake proof still requires a cross-process allocation mutex, PM2 ownership-metadata codec and exact-name list/start/stop/delete adapter, stable-file output reset, repeated live reuse/caller-death tests, secret handoff, and a runnable Windows Job Object materializer proving descendant containment. No ordinary recipe is routed through this kernel yet.
+
 ## Admission boundary
 
 @admit Admit only source behavior proved by focused Bake tests and required by the broker contract: versioned XML decoding, normalized typed recipe data, recipe id/kind/status/source where proven, parameter resolution, argv atoms, nonsecret environment planning, cwd/tool identity, port claims, probes, lifecycle and stop policy, completion/timeout fields, receiver selection, structured status/events, bounded output facts, and exact lifecycle operations.

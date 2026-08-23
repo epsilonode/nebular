@@ -71,7 +71,11 @@ const successPorts = (
     installAtomically: patch => Promise.resolve((() => {
       patch.entries.forEach(entry => entry.secret.withValue(secretText =>
         inspectSecret(entry.environmentName, secretText)));
-      return clientOk({ atomic: true, installedSlots: patch.slots });
+      return clientOk({
+        atomic: true,
+        installedSlots: patch.slots,
+        cleanup: { rollback: () => Promise.resolve(clientOk(undefined)) }
+      });
     })())
   };
   return { clock: { nowMs: () => 1_000 }, environment, transport };
@@ -290,5 +294,36 @@ describe('cooperative bootstrap composition', () => {
       })]
     }));
     expect(evaluated).toBe(false);
+  });
+
+  it('rolls back an installed environment when deferred application import fails', async () => {
+    let rollbacks = 0;
+    const response = delivery();
+    const base = successPorts(response);
+    const ports: CooperativeBootstrapPorts = {
+      ...base,
+      environment: {
+        installAtomically: patch => Promise.resolve(clientOk({
+          atomic: true,
+          installedSlots: patch.slots,
+          cleanup: {
+            rollback: () => {
+              rollbacks += 1;
+              return Promise.resolve(clientOk(undefined));
+            }
+          }
+        }))
+      }
+    };
+
+    const loaded = await prepareRecipeEnvironmentThenImport({
+      request: request(),
+      inheritedEnvironmentNames: []
+    }, ports, () => Promise.reject(new Error('synthetic import failure')));
+
+    expect(loaded).toEqual(expect.objectContaining({
+      error: [expect.objectContaining({ code: 'application-import-failed' })]
+    }));
+    expect(rollbacks).toBe(1);
   });
 });

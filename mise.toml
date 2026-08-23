@@ -43,3 +43,7 @@ run = "bun run verify:declarations"
 [tasks.verify-lint-policy]
 description = "Prove the hard-FP and authority-boundary rules with negative fixtures"
 run = "bun run verify:lint-policy"
+
+[tasks.verify-type-policy]
+description = "Prove illegal trust, authority, exposure, and provider states do not compile"
+run = "bun run verify:type-policy"

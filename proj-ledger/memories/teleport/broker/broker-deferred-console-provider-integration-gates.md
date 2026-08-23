@@ -19,6 +19,7 @@ hook: "read before choosing the Windows console host, final CLI aliases, first p
 
 ## Trusted console gate
 
+@algebra Broker-owned prompt planning and credential-enrollment orchestration may land before host selection: they must bind display identity to the awaiting-consent state, require a distinct visible masked/clipboard-free host, keep input callback-scoped, and emit only redacted lifecycle/store receipts. This algebra is not evidence that a Windows host exists.
 @timing Select and prove the Windows console host before implementing the production consent UI. The choice must support a distinct user-visible window, masked input, broker-derived identity display, cancellation/timeout, parent/child result correlation, and no secret in argv, environment, shell history, clipboard, logs, SQLite, or crash output.
 @candidates Evaluate direct Windows new-console process creation and an available terminal host through a narrow `TrustedPromptPort`. Do not make PowerShell, `cmd /c start`, Windows Terminal, or a GUI framework normative until lifecycle, quoting, availability, spoof resistance, and result-channel proof passes.
 @fallback A missing preferred terminal returns a typed unavailable prompt outcome or uses an explicitly admitted second host. It never falls back to reading a key in the agent's current console/chat channel.

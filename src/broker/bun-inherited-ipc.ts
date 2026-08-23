@@ -14,6 +14,8 @@ import {
   type BrokerTerminalMessage,
   type BrokerTimestampMs
 } from '../broker-client/public.ts';
+
+export { BROKER_IPC_CHILD_ARGUMENT, type BrokerRequestId } from '../broker-client/public.ts';
 import { openBrokerControlSession } from './control-handler.ts';
 import {
   createDefaultBrokerOperationPort,

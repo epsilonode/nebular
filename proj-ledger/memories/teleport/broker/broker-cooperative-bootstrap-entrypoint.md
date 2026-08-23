@@ -32,6 +32,8 @@ hook: "read before exposing a bootstrap import, mutating a target environment, c
 @install Construct an allowlisted environment patch from declared slots. Reject undeclared slots, duplicate/case-fold collisions, NUL/invalid names, reserved loader/runtime variables, nonsecret-entry collisions, and values exceeding provider/platform budgets. Install only in the current process immediately before application import.
 @inherit The recipe declares the nonsecret inheritance policy. Bootstrap augments that already filtered environment; it never copies the runner, broker, user shell, or PM2 daemon environment wholesale.
 @failure Failure before import leaves application code unevaluated and exits with a typed non-restarting or policy-selected classification. No partial slot set is installed unless the recipe explicitly declares a safe atomic grouping policy; default delivery is all-or-nothing.
+@rollback The install receipt carries a private idempotent cleanup capability until protocol commit and deferred import succeed. Roll back newly installed names after an inconsistent receipt, acknowledgement construction/send failure, timeout/disconnect, helper nonzero exit after acknowledgement, or deferred import rejection. Rollback failure becomes its own explicit exposure ambiguity and cannot be reported as clean failure.
+@commit Environment installation alone is not success. The target acknowledges exact lease, process attempt, slot ids, and count, then waits for the helper to persist its terminal lease transition, disconnect, and exit 0. Only that clean helper exit releases the transport result; a later helper failure invokes rollback.
 
 ## Restart, renewal, and lifetime
 
@@ -47,4 +49,4 @@ hook: "read before exposing a bootstrap import, mutating a target environment, c
 
 ## Proof
 
-@proof Test that no application top-level code runs before preparation; success/all-or-nothing failure; helper exit; no extra persistent process; PM2 restart revalidation; expired/revoked/drifted grants; attempt spoofing; slot collision/reserved variables; no-secret recipes; output/error redaction; secret canaries in PM2 state, argv, logs, journal, crash reports, bundles, and source maps; and browser/Deno typed rejection.
+@proof Test that no application top-level code runs before preparation; success/all-or-nothing failure; idempotent reverse rollback after every post-install failure; explicit rollback failure; helper exit; no extra persistent process; PM2 restart revalidation; expired/revoked/drifted grants; attempt spoofing; slot collision/reserved variables; no-secret recipes; output/error redaction; secret canaries in PM2 state, argv, logs, journal, crash reports, bundles, and source maps; and browser/Deno typed rejection.

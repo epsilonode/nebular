@@ -14,7 +14,8 @@ export default tseslint.config(
       'dist/**',
       'node_modules/**',
       'reports/**',
-      'src/**/__lint_negative__/**'
+      'src/**/__lint_negative__/**',
+      'src/**/__type_negative__/**'
     ]
   },
   js.configs.recommended,
@@ -202,6 +203,25 @@ export default tseslint.config(
     }
   },
   {
+    files: ['src/broker-client/bootstrap/bun-inherited-ipc.ts'],
+    rules: {
+      // The target-side Bun IPC adapter owns its bounded callback state and
+      // subprocess handle; decoded bootstrap messages remain immutable.
+      'functional/immutable-data': 'off',
+      'functional/no-let': 'off',
+      'functional/prefer-immutable-types': 'off'
+    }
+  },
+  {
+    files: ['src/broker-client/bootstrap/bun-process-environment.ts'],
+    rules: {
+      // Current-process environment mutation is the adapter's sole authority;
+      // staging, collision checks, rollback, and receipts remain typed.
+      'functional/immutable-data': 'off',
+      'functional/prefer-immutable-types': 'off'
+    }
+  },
+  {
     files: ['src/broker-client/result.ts'],
     rules: {
       // neverthrow Result/ResultAsync are foreign class-backed values; the
@@ -221,13 +241,17 @@ export default tseslint.config(
     files: [
       'src/broker/result.ts',
       'src/broker/authority.ts',
+      'src/broker/bootstrap-authority.ts',
+      'src/broker/bun-bootstrap-inherited-ipc.ts',
       'src/broker/bun-inherited-ipc.ts',
       'src/broker/bun-secret-store.ts',
       'src/broker/effect-runtime.ts',
       'src/broker/lease.ts',
       'src/broker/operation.ts',
+      'src/broker/provider-contract.ts',
       'src/broker/receiver.ts',
-      'src/broker/secret-delivery.ts'
+      'src/broker/secret-delivery.ts',
+      'src/broker/trusted-prompt.ts'
     ],
     rules: {
       // neverthrow ResultAsync is implemented as a class but represents the
@@ -245,6 +269,14 @@ export default tseslint.config(
     }
   },
   {
+    files: ['src/broker/bun-bootstrap-inherited-ipc.ts'],
+    rules: {
+      // The privileged Bun bootstrap leaf confines callback IPC mechanics and
+      // transient secret staging behind the lease/delivery protocol.
+      'functional/immutable-data': 'off'
+    }
+  },
+  {
     files: ['src/broker/bun-sqlite-journal.ts'],
     rules: {
       // The Bun SQLite module and Database handles are mutable foreign values.
@@ -253,7 +285,7 @@ export default tseslint.config(
     }
   },
   {
-    files: ['src/broker/result.ts', 'src/broker/lease.ts'],
+    files: ['src/broker/result.ts', 'src/broker/lease.ts', 'src/broker/trusted-prompt.ts'],
     rules: {
       // neverthrow Result/ResultAsync declarations are foreign class-backed
       // values; domain issue and state records remain readonly.

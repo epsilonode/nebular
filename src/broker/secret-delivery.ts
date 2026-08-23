@@ -219,24 +219,32 @@ const completeDelivery = (
   );
 };
 
+export const activateAuthorizedSecretLease = (
+  lease: AuthorizedSecretLease,
+  atMs: number
+): SecretLeaseResult<ActiveSecretLease> => reduceSecretLease(lease, { type: 'activate', atMs }).andThen(activated =>
+  activated.state === 'active'
+    ? secretLeaseOk(activated)
+    : secretLeaseErr({
+        code: 'lease-transition-invalid',
+        message: 'Secret lease activation produced a non-active state.'
+      })
+);
+
+export const deliverActiveSecretLease = (
+  active: ActiveSecretLease,
+  ports: SecretDeliveryPorts
+): SecretLeaseTaskResult<SecretDeliveryTerminal> => ports.bootstrap.runWithSecrets(
+  toBootstrapContext(active),
+  sink => deliverBindings(active.facts.bindings, 0, sink, ports.secretStore)
+).andThen(receipt => completeDelivery(active, receipt, ports.clock.nowMs()))
+  .orElse(issues => revokeAfterDeliveryFailure(active, ports.clock.nowMs(), issues));
+
 export const deliverAuthorizedSecretLease = (
   lease: AuthorizedSecretLease,
   ports: SecretDeliveryPorts
 ): SecretLeaseTaskResult<SecretDeliveryTerminal> => {
-  const activation = reduceSecretLease(lease, { type: 'activate', atMs: ports.clock.nowMs() });
+  const activation = activateAuthorizedSecretLease(lease, ports.clock.nowMs());
   if (activation.isErr()) return secretLeaseTaskErr(activation.error[0], ...activation.error.slice(1));
-  if (activation.value.state !== 'active') {
-    return secretLeaseTaskErr({
-      code: 'lease-transition-invalid',
-      message: 'Secret lease activation produced a non-active state.'
-    });
-  }
-  const active = activation.value;
-  const bootstrap = ports.bootstrap.runWithSecrets(
-    toBootstrapContext(active),
-    sink => deliverBindings(active.facts.bindings, 0, sink, ports.secretStore)
-  );
-  return bootstrap
-    .andThen(receipt => completeDelivery(active, receipt, ports.clock.nowMs()))
-    .orElse(issues => revokeAfterDeliveryFailure(active, ports.clock.nowMs(), issues));
+  return deliverActiveSecretLease(activation.value, ports);
 };

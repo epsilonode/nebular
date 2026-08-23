@@ -59,6 +59,9 @@ must_know:
   broker_inherited_ipc:
     path: memories/teleport/broker/broker-inherited-ipc-v1-contract.md
     read_before: [inherited IPC, Bun IPC, broker envelope, IPC version, request id, secret bootstrap channel, IPC cancellation]
+  broker_durable_bootstrap_authority:
+    path: memories/teleport/broker/broker-durable-bootstrap-authority-and-cleanup.md
+    read_before: [production broker bootstrap, bootstrap authority, atomic lease claim, current receiver attempt, PM2 parent verification, checked-in recipe reread, environment rollback, helper exit 78, ambiguous terminal recovery]
   broker_consent_and_car_unlock:
     path: memories/teleport/broker/broker-consent-and-car-unlock.md
     read_before: [credential prompt, key entry, consent surface, PIN, passphrase, encrypted CAR import, encrypted CAR refresh]

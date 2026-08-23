@@ -11,6 +11,7 @@ refs:
   - roadmaps/broker.md#add-child-process-and-jsts-clients
   - memories/teleport/broker/broker-request-grant-transfer-state-machines.md
   - memories/teleport/broker/broker-secret-values-and-lifetime.md
+  - memories/teleport/broker/broker-durable-bootstrap-authority-and-cleanup.md
 hook: "read before implementing Bun parent-child IPC, defining broker envelopes, adding IPC authentication, transmitting bootstrap credentials, handling disconnect or cancellation, or proposing localhost/Hono"
 ---
 
@@ -31,8 +32,10 @@ hook: "read before implementing Bun parent-child IPC, defining broker envelopes,
 
 @separate Credential material uses a distinct closed bootstrap protocol invoked only after broker-side authority and target-attempt checks. Do not add optional secret fields to ordinary control/status envelopes or reuse output/event serializers for credential delivery.
 @request The cooperative target supplies nonsecret protocol, repository/recipe/grant/attempt/receiver references and requested declared slot ids. The helper independently resolves and validates current authority rather than trusting those claims.
+@authority The request references are locators only. The helper joins durable grant and attempt records to a current PM2/OS parent-process proof and a fresh checked-in Git recipe read, compares repository/revision/generation/receiver/attempt/slots exactly, and atomically claims one nonterminal bootstrap lease before reading the keychain.
 @response The helper returns either a typed redacted failure or one bounded map of admitted slot id/injection name to secret bytes/strings over the inherited private channel. It never returns extra credentials, provider metadata unnecessary for delivery, refresh authority, or a reusable environment snapshot.
-@lifetime The target installs values immediately, acknowledges only slot ids/count and completion, drops message references, disconnects, and lets the helper exit. Neither endpoint journals, audits, logs, retries, snapshots, or crash-dumps the secret-bearing payload.
+@lifetime The target installs values immediately, acknowledges only lease/attempt/slot ids, slot count, and completion, drops message references, disconnects, and lets the helper exit. Neither endpoint journals, audits, logs, retries, snapshots, or crash-dumps the secret-bearing payload.
+@terminal The transport resolves success only after the helper persists `active -> consumed`, disconnects, and exits 0. If installation has occurred and acknowledgement send, disconnect, deadline, durable terminal transition, or helper exit fails, the target invokes its private environment rollback capability and reports a typed redacted failure.
 
 ## Lifecycle
 
@@ -40,6 +43,7 @@ hook: "read before implementing Bun parent-child IPC, defining broker envelopes,
 @disconnect Parent cancellation or disappearance cancels pre-materialization work and finalizes scoped resources. After receiver materialization, disconnect policy follows the recipe lifecycle: bounded one-shot may continue under receiver ownership; foreground requests may cancel; services remain receiver-owned. The journal records redacted disposition.
 @cancel Cancellation names request/attempt and expected generation, is idempotent, and produces progress plus one terminal result. Closing the IPC channel is not itself an authoritative cancellation command.
 @exit Broker helpers exit after their one operation and close keychain, SQLite, PM2/control, prompt, file, and IPC resources through scoped finalizers. A helper left resident after a terminal result fails conformance.
+@unavailable The public broker root may recognize the exact bootstrap child marker while returning configuration exit 78 before the handshake when production authority adapters are absent. It must not run a test/fake authority composition or deliver values merely to make the entrypoint appear complete.
 
 ## Proof
 

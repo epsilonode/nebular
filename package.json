@@ -38,7 +38,7 @@
   "scripts": {
     "lint": "bun run lint:teleport && bun run lint:broker-client && bun run lint:recipe-runner && bun run lint:broker && bun run lint:configuration",
     "lint:fix": "eslint . --fix",
-    "lint:configuration": "eslint vitest.config.ts vitest.shared.ts vitest.shared.test.ts tooling --max-warnings 0",
+    "lint:configuration": "eslint vitest.config.ts vitest.shared.ts vitest.shared.test.ts tooling --ignore-pattern tooling/fixtures/package-consumer.ts --max-warnings 0",
     "lint:teleport": "eslint teleport.ts teleport.test.ts src/teleport --max-warnings 0",
     "lint:broker-client": "eslint broker-client.ts broker-client.test.ts \"src/broker-client/*.ts\" --max-warnings 0 && eslint src/broker-client/bootstrap --max-warnings 0",
     "lint:recipe-runner": "eslint recipe-runner.ts recipe-runner.test.ts src/recipe-runner --max-warnings 0",
@@ -56,7 +56,7 @@
     "test:recipe-runner": "vitest run --project recipe-runner",
     "test:broker": "vitest run --project broker",
     "test:seam": "vitest run --project seam",
-    "test:live": "bun test src/broker/bun-sqlite-journal.test.ts && vitest run --project live --passWithNoTests && bun tooling/live/bun-secret-store.ts && bun tooling/live/bun-inherited-ipc.ts && bun tooling/live/recipe-runner-doctor.ts",
+    "test:live": "bun test src/broker/bun-sqlite-journal.test.ts && vitest run --project live --passWithNoTests && bun tooling/live/bun-secret-store.ts && bun tooling/live/bun-inherited-ipc.ts && bun tooling/live/bun-secret-bootstrap.ts && bun tooling/live/recipe-runner-doctor.ts",
     "test:coverage": "vitest run --coverage --project teleport --project broker-client --project recipe-runner --project broker --project seam",
     "check:configuration": "bun run lint:configuration && bun run typecheck:tests && bun run test:configuration",
     "check:teleport": "bun run lint:teleport && bun run typecheck:teleport && bun run test:teleport",
@@ -70,7 +70,8 @@
     "verify:declarations": "tsc --noEmit -p tsconfig.package-consumer.json",
     "verify:artifacts": "bun tooling/verify-artifacts.ts",
     "verify:lint-policy": "bun tooling/verify-lint-policy.ts",
-    "verify": "bun run check && bun run verify:lint-policy && bun run build && bun run verify:declarations && bun run verify:artifacts"
+    "verify:type-policy": "tsc --noEmit -p tsconfig.type-negative.json",
+    "verify": "bun run check && bun run verify:lint-policy && bun run verify:type-policy && bun run build && bun run verify:declarations && bun run verify:artifacts"
   },
   "dependencies": {
     "@ipld/car": "5.4.7",

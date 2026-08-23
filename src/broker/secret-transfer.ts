@@ -34,6 +34,7 @@ export type SecretTransferIssueCode =
   | 'destination-denied'
   | 'input-invalid'
   | 'private-inventory-rejected'
+  | 'preview-mismatch'
   | 'protection-required'
   | 'recipient-mismatch'
   | 'recovery-required'

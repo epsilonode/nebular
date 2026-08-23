@@ -8,12 +8,26 @@ import {
   unlockTeleportCartridgeWithRecipientUnwrapper,
   type TeleportRecipientKeyUnwrapper,
   type TeleportSignatureVerifier,
+  type VerifiedCapability,
   type VerifiedTeleportCartridge,
   verifyTeleportCartridge,
   verifyTeleportSignatures
 } from '../teleport/public.ts';
 import type { CredentialReference } from './lease.ts';
 import type { JournalOperationId } from './journal.ts';
+import {
+  createSecretTransferAuthenticatedPreview,
+  secretTransferInventoryCapabilityCodec,
+  secretTransferInventoryInstanceId,
+  secretTransferPreviewCapabilityCodec,
+  secretTransferPreviewInstanceId,
+  validateSecretTransferPreviewAdmission,
+  verifySecretTransferPreviewBinding,
+  SECRET_TRANSFER_INVENTORY_CAPABILITY_ID,
+  SECRET_TRANSFER_PREVIEW_CAPABILITY_ID,
+  SECRET_TRANSFER_PREVIEW_VERSION,
+  type SecretTransferAuthenticatedPreviewV1
+} from './secret-transfer-preview.ts';
 import {
   planSecretTransferExport,
   planSecretTransferImport,
@@ -52,6 +66,12 @@ export type SecretTransferSigningAuthority = Readonly<{
 }>;
 
 export type EncryptedSecretTransferCartridge = Readonly<{
+  profile: 'signed-preview-private-inventory-v1';
+  bytes: Uint8Array;
+  rootCid: string;
+}>;
+
+export type ProtectedSecretTransferInventory = Readonly<{
   profile: 'private-inventory-v1';
   bytes: Uint8Array;
   rootCid: string;
@@ -71,9 +91,12 @@ export type SecretTransferSourcePort = Readonly<{
 
 export type SecretTransferPrivateInventoryPort = Readonly<{
   /** Owns the local passphrase/PIN consent surface and never returns it. */
-  protect: (archive: TeleportCartridgeArchive) => SecretTransferTaskResult<EncryptedSecretTransferCartridge>;
+  protect: (archive: TeleportCartridgeArchive) => SecretTransferTaskResult<ProtectedSecretTransferInventory>;
   /** Returns a graph-verified inner cartridge only after local unlock succeeds. */
-  unlock: (bytes: Uint8Array) => SecretTransferTaskResult<UnlockedSecretTransferInventory>;
+  unlock: (
+    bytes: Uint8Array,
+    prompt: SecretTransferUnlockPrompt
+  ) => SecretTransferTaskResult<UnlockedSecretTransferInventory>;
 }>;
 
 export type SecretTransferDestinationAuthorityPort = Readonly<{
@@ -111,6 +134,17 @@ export type SecretTransferReplacementConsentPort = Readonly<{
   confirm: (
     prompt: SecretTransferReplacementPrompt
   ) => SecretTransferTaskResult<'approved' | 'denied'>;
+}>;
+
+export type SecretTransferUnlockPrompt = Readonly<{
+  type: 'secret-transfer-unlock';
+  version: 1;
+  preview: SecretTransferAuthenticatedPreviewV1;
+  verifiedSignerKeyIds: readonly string[];
+  destinationRepository: SecretTransferDestinationRequest['repository'];
+  destinationRecipeRevision: SecretTransferDestinationRequest['recipeRevision'];
+  destinationCredentialReference: CredentialReference;
+  destinationStatus: SecretTransferDestinationStatus;
 }>;
 
 export type SecretTransferInstallSink = Readonly<{
@@ -237,6 +271,74 @@ const buildCapability = (
   secret: { bytes: Uint8Array.from(plaintext.bytes) }
 });
 
+const buildSignedPreviewArchive = async (
+  request: ExportEncryptedSecretTransferRequest,
+  plan: SecretTransferExportPlan,
+  inventory: ProtectedSecretTransferInventory
+): SecretTransferTaskResult<EncryptedSecretTransferCartridge> => {
+  const inventoryBlock = await encodeCapability({
+    codec: secretTransferInventoryCapabilityCodec,
+    value: { bytes: inventory.bytes },
+    instanceId: secretTransferInventoryInstanceId(plan.facts.transferId),
+    required: true,
+    restoreMode: 'retain'
+  });
+  if (!inventoryBlock.ok) return transferFailure(
+    'car-build-failed',
+    'Encrypted secret-transfer inventory carrier encoding failed.'
+  );
+  const preview = await createSecretTransferAuthenticatedPreview({
+    facts: plan.facts,
+    inventoryCid: inventoryBlock.value.cid.toString()
+  });
+  if (preview.type === 'err') return preview;
+  const previewBlock = await encodeCapability({
+    codec: secretTransferPreviewCapabilityCodec,
+    value: preview.value,
+    instanceId: secretTransferPreviewInstanceId(plan.facts.transferId),
+    required: true,
+    restoreMode: 'retain'
+  });
+  if (!previewBlock.ok) return transferFailure(
+    'car-build-failed',
+    'Authenticated secret-transfer preview encoding failed.'
+  );
+  const unsigned = await createTeleportCartridge({
+    capabilities: [previewBlock.value, inventoryBlock.value]
+  });
+  if (!unsigned.ok) return transferFailure(
+    'car-build-failed',
+    'Authenticated secret-transfer preview cartridge assembly failed.'
+  );
+  const verifiedUnsigned = await verifyTeleportCartridge(unsigned.value.bytes);
+  if (!verifiedUnsigned.ok) return transferFailure(
+    'car-build-failed',
+    'Authenticated secret-transfer preview cartridge verification failed.'
+  );
+  const signed = await addTeleportSignature(verifiedUnsigned.value, request.signer);
+  if (!signed.ok) return transferFailure(
+    'car-build-failed',
+    'Authenticated secret-transfer preview signing failed.'
+  );
+  const verifiedSigned = await verifyTeleportCartridge(signed.value.bytes);
+  if (!verifiedSigned.ok) return transferFailure(
+    'car-build-failed',
+    'Signed secret-transfer preview cartridge is invalid.'
+  );
+  const signature = await verifyTeleportSignatures(
+    verifiedSigned.value,
+    [{ keyId: request.signer.keyId, publicKey: request.signer.publicKey }],
+    [request.signer.keyId]
+  );
+  return signature.ok
+    ? secretTransferOk({
+      profile: 'signed-preview-private-inventory-v1',
+      bytes: signed.value.bytes,
+      rootCid: signed.value.root.toString()
+    })
+    : transferFailure('car-build-failed', 'Secret-transfer preview signature self-check failed.');
+};
+
 const buildEncryptedArchive = async (
   request: ExportEncryptedSecretTransferRequest,
   plan: SecretTransferExportPlan,
@@ -271,10 +373,12 @@ const buildEncryptedArchive = async (
   );
   if (!signature.ok) return transferFailure('car-build-failed', 'Secret-transfer signature self-check failed.');
   const privateArchive = await privateInventory.protect(signed.value);
-  return privateArchive.type === 'err'
-    ? privateArchive
+  if (privateArchive.type === 'err') return privateArchive;
+  const previewArchive = await buildSignedPreviewArchive(request, plan, privateArchive.value);
+  return previewArchive.type === 'err'
+    ? previewArchive
     : secretTransferOk<ExportedEncryptedSecretTransfer>({
-      cartridge: privateArchive.value,
+      cartridge: previewArchive.value,
       receipt: {
         type: 'secret-transfer-export-receipt',
         version: 1,
@@ -284,7 +388,7 @@ const buildEncryptedArchive = async (
         intendedRecipientKeyId: plan.facts.intendedRecipientKeyId,
         transferExpiresAtMs: plan.facts.transferExpiresAtMs,
         signerKeyId: request.signer.keyId,
-        rootCid: privateArchive.value.rootCid,
+        rootCid: previewArchive.value.rootCid,
         secretBytesExcluded: true
       }
     });
@@ -341,6 +445,80 @@ const hasUniqueStableKeyIds = (keyIds: readonly string[]): boolean =>
   keyIds.length > 0 &&
   keyIds.every(keyId => keyId.length > 0 && keyId.length <= 128 && !keyId.includes('\0')) &&
   new Set(keyIds).size === keyIds.length;
+
+const sameStringSet = (left: readonly string[], right: readonly string[]): boolean => {
+  const normalizedLeft: readonly string[] = [...new Set(left)].toSorted();
+  const normalizedRight: readonly string[] = [...new Set(right)].toSorted();
+  return normalizedLeft.length === normalizedRight.length &&
+    normalizedLeft.every((entry, index) => entry === normalizedRight[index]);
+};
+
+type SecretTransferPreviewEnvelope = Readonly<{
+  previewCapability: VerifiedCapability;
+  inventoryCapability: VerifiedCapability;
+}>;
+
+const validatePreviewEnvelopeShape = (
+  cartridge: VerifiedTeleportCartridge
+): SecretTransferResult<SecretTransferPreviewEnvelope> => {
+  const previewCapability = cartridge.capabilities.find(
+    capability => capability.descriptor.capabilityId === SECRET_TRANSFER_PREVIEW_CAPABILITY_ID
+  );
+  const inventoryCapability = cartridge.capabilities.find(
+    capability => capability.descriptor.capabilityId === SECRET_TRANSFER_INVENTORY_CAPABILITY_ID
+  );
+  if (cartridge.capabilities.length !== 2 || cartridge.keyEnvelopes.length !== 0 ||
+      previewCapability === undefined || inventoryCapability === undefined ||
+      previewCapability.descriptor.schemaVersion !== SECRET_TRANSFER_PREVIEW_VERSION ||
+      previewCapability.descriptor.securityClass !== 'public' ||
+      previewCapability.descriptor.required !== true || previewCapability.descriptor.codec !== 'dag-cbor' ||
+      previewCapability.descriptor.restoreMode !== 'retain' ||
+      previewCapability.descriptor.protection.mode !== 'plain' ||
+      inventoryCapability.descriptor.schemaVersion !== 1 ||
+      inventoryCapability.descriptor.securityClass !== 'opaque-native' ||
+      inventoryCapability.descriptor.required !== true || inventoryCapability.descriptor.codec !== 'raw' ||
+      inventoryCapability.descriptor.restoreMode !== 'retain' ||
+      inventoryCapability.descriptor.protection.mode !== 'plain' ||
+      inventoryCapability.descriptor.dependencies.length !== 0) {
+    return transferFailure('car-invalid', 'Authenticated secret-transfer preview envelope is invalid.');
+  }
+  return cartridge.signatures.length === 0
+    ? transferFailure('signature-required', 'Authenticated secret-transfer preview must be signed.')
+    : secretTransferOk({ previewCapability, inventoryCapability });
+};
+
+const decodeAuthenticatedPreview = (
+  envelope: SecretTransferPreviewEnvelope
+): SecretTransferResult<SecretTransferAuthenticatedPreviewV1> => {
+  const previewBytes = envelope.previewCapability.contentBytes;
+  if (previewBytes === undefined) return transferFailure(
+    'car-invalid',
+    'Authenticated secret-transfer preview bytes are missing.'
+  );
+  const decoded = decodeCapability(
+    secretTransferPreviewCapabilityCodec,
+    envelope.previewCapability.descriptor.schemaVersion,
+    previewBytes
+  );
+  if (!decoded.ok) return transferFailure('car-invalid', 'Authenticated secret-transfer preview is invalid.');
+  const dependency = envelope.previewCapability.descriptor.dependencies.at(0);
+  return envelope.previewCapability.descriptor.dependencies.length === 1 &&
+    dependency?.kind === 'hard-decode' && dependency.required === true &&
+    dependency.capabilityId === SECRET_TRANSFER_INVENTORY_CAPABILITY_ID &&
+    dependency.instanceId === envelope.inventoryCapability.descriptor.instanceId &&
+    decoded.value.inventoryInstanceId === envelope.inventoryCapability.descriptor.instanceId &&
+    decoded.value.inventoryCid === envelope.inventoryCapability.descriptor.block.toString()
+    ? secretTransferOk(decoded.value)
+    : transferFailure('preview-mismatch', 'Authenticated preview is not bound to its encrypted inventory.');
+};
+
+type StagedSecretTransferPreview = Readonly<{
+  preview: SecretTransferAuthenticatedPreviewV1;
+  inventoryBytes: Uint8Array;
+  verifiedSignerKeyIds: readonly string[];
+  replayStatus: 'fresh';
+  destinationStatus: SecretTransferDestinationStatus;
+}>;
 
 const decodeProtectedCapability = (
   cartridge: VerifiedTeleportCartridge
@@ -435,6 +613,8 @@ const authorizeAndCommit = async (
   request: ImportEncryptedSecretTransferRequest,
   capability: SecretTransferCapabilityV1,
   verifiedSignerKeyIds: readonly string[],
+  replayStatus: 'fresh',
+  destinationStatus: SecretTransferDestinationStatus,
   ports: SecretTransferImportPorts
 ): SecretTransferTaskResult<ImportedEncryptedSecretTransfer> => {
   const facts = secretTransferPortableFacts(capability);
@@ -444,24 +624,16 @@ const authorizeAndCommit = async (
     atMs: request.atMs
   });
   if (admission.type === 'err') return admission;
-  const replay = await ports.replay.inspect(facts.transferId);
-  if (replay.type === 'err') return replay;
-  if (replay.value === 'consumed') return transferFailure(
-    'transfer-replayed',
-    'Secret transfer was already consumed.'
-  );
   const destination = await ports.destinationAuthority.authorize(request.destination, facts);
   if (destination.type === 'err') return destination;
-  const conflict = await ports.conflict.inspect(request.destination.credentialReference);
-  if (conflict.type === 'err') return conflict;
   const plan = planSecretTransferImport({
     facts,
     recipientKeyId: request.recipient.keyId,
     atMs: request.atMs,
-    replayStatus: replay.value,
+    replayStatus,
     destinationRequest: request.destination,
     destination: destination.value,
-    destinationStatus: conflict.value
+    destinationStatus
   });
   if (plan.type === 'err') return plan;
   const approved = await replacementApproved(plan.value, ports.replacementConsent);
@@ -477,13 +649,24 @@ const authorizeAndCommit = async (
     );
 };
 
-const verifyUnlockAndImport = async (
+const unlockPrompt = (
   request: ImportEncryptedSecretTransferRequest,
-  inventory: UnlockedSecretTransferInventory,
+  staged: StagedSecretTransferPreview
+): SecretTransferUnlockPrompt => ({
+  type: 'secret-transfer-unlock',
+  version: 1,
+  preview: staged.preview,
+  verifiedSignerKeyIds: staged.verifiedSignerKeyIds,
+  destinationRepository: request.destination.repository,
+  destinationRecipeRevision: request.destination.recipeRevision,
+  destinationCredentialReference: request.destination.credentialReference,
+  destinationStatus: staged.destinationStatus
+});
+
+const stageAuthenticatedPreview = async (
+  request: ImportEncryptedSecretTransferRequest,
   ports: SecretTransferImportPorts
-): SecretTransferTaskResult<ImportedEncryptedSecretTransfer> => {
-  const shaped = validateProtectedSignedShape(inventory.cartridge, request.recipient.keyId);
-  if (shaped.type === 'err') return shaped;
+): SecretTransferTaskResult<StagedSecretTransferPreview> => {
   if (!hasUniqueStableKeyIds(request.requiredSignerKeyIds)) return transferFailure(
     'signature-required',
     'At least one trusted signer is required for secret transfer.'
@@ -492,24 +675,88 @@ const verifyUnlockAndImport = async (
     'signer-untrusted',
     'Secret-transfer signer policy is ambiguous.'
   );
+  const verified = await verifyTeleportCartridge(request.cartridgeBytes);
+  if (!verified.ok) return transferFailure('car-invalid', 'Authenticated secret-transfer preview CAR is invalid.');
+  const envelope = validatePreviewEnvelopeShape(verified.value);
+  if (envelope.type === 'err') return envelope;
+  const signatures = await verifyTeleportSignatures(
+    verified.value,
+    request.trustedSigners,
+    request.requiredSignerKeyIds
+  );
+  if (!signatures.ok) return transferFailure('signer-untrusted', 'Secret-transfer preview signer is not trusted.');
+  const preview = decodeAuthenticatedPreview(envelope.value);
+  if (preview.type === 'err') return preview;
+  const admission = validateSecretTransferPreviewAdmission({
+    preview: preview.value,
+    recipientKeyId: request.recipient.keyId,
+    atMs: request.atMs
+  });
+  if (admission.type === 'err') return admission;
+  const replay = await ports.replay.inspect(preview.value.transferId);
+  if (replay.type === 'err') return replay;
+  if (replay.value === 'consumed') return transferFailure(
+    'transfer-replayed',
+    'Secret transfer was already consumed.'
+  );
+  const conflict = await ports.conflict.inspect(request.destination.credentialReference);
+  if (conflict.type === 'err') return conflict;
+  if (conflict.value === 'present' &&
+      request.destination.conflictPolicy !== 'replace-with-elevated-consent') {
+    return transferFailure(
+      'conflict-rejected',
+      'Destination credential conflict requires an explicit elevated replacement policy.'
+    );
+  }
+  const inventoryBytes = envelope.value.inventoryCapability.contentBytes;
+  return inventoryBytes === undefined
+    ? transferFailure('car-invalid', 'Encrypted secret-transfer inventory bytes are missing.')
+    : secretTransferOk({
+      preview: preview.value,
+      inventoryBytes: Uint8Array.from(inventoryBytes),
+      verifiedSignerKeyIds: signatures.value.verifiedSignerKeyIds,
+      replayStatus: 'fresh',
+      destinationStatus: conflict.value
+    });
+};
+
+const verifyUnlockedInventoryAndImport = async (
+  request: ImportEncryptedSecretTransferRequest,
+  staged: StagedSecretTransferPreview,
+  inventory: UnlockedSecretTransferInventory,
+  ports: SecretTransferImportPorts
+): SecretTransferTaskResult<ImportedEncryptedSecretTransfer> => {
+  const shaped = validateProtectedSignedShape(inventory.cartridge, request.recipient.keyId);
+  if (shaped.type === 'err') return shaped;
   const signatures = await verifyTeleportSignatures(
     shaped.value,
     request.trustedSigners,
     request.requiredSignerKeyIds
   );
   if (!signatures.ok) return transferFailure('signer-untrusted', 'Secret-transfer signer is not trusted.');
+  if (!sameStringSet(signatures.value.verifiedSignerKeyIds, staged.verifiedSignerKeyIds)) return transferFailure(
+    'preview-mismatch',
+    'Authenticated preview and unlocked transfer signer identities differ.'
+  );
   const unlocked = await unlockTeleportCartridgeWithRecipientUnwrapper(
     shaped.value,
     request.recipient
   );
   if (!unlocked.ok) return transferFailure('recipient-mismatch', 'Secret-transfer recipient unlock failed.');
   const capability = decodeProtectedCapability(unlocked.value);
-  return capability.type === 'err'
-    ? capability
+  if (capability.type === 'err') return capability;
+  const binding = await verifySecretTransferPreviewBinding(
+    staged.preview,
+    secretTransferPortableFacts(capability.value)
+  );
+  return binding.type === 'err'
+    ? binding
     : authorizeAndCommit(
       request,
       capability.value,
-      signatures.value.verifiedSignerKeyIds,
+      staged.verifiedSignerKeyIds,
+      staged.replayStatus,
+      staged.destinationStatus,
       ports
     );
 };
@@ -522,8 +769,13 @@ export const importEncryptedSecretTransfer = async (
     'input-invalid',
     'Encrypted secret-transfer cartridge is empty.'
   );
-  const inventory = await ports.privateInventory.unlock(request.cartridgeBytes);
+  const staged = await stageAuthenticatedPreview(request, ports);
+  if (staged.type === 'err') return staged;
+  const inventory = await ports.privateInventory.unlock(
+    staged.value.inventoryBytes,
+    unlockPrompt(request, staged.value)
+  );
   return inventory.type === 'err'
     ? inventory
-    : verifyUnlockAndImport(request, inventory.value, ports);
+    : verifyUnlockedInventoryAndImport(request, staged.value, inventory.value, ports);
 };

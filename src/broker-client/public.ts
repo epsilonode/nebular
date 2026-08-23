@@ -1,5 +1,7 @@
 export * from './bootstrap/protocol.ts';
 export * from './bootstrap/cooperative.ts';
+export * from './bootstrap/bun-inherited-ipc.ts';
+export * from './bootstrap/bun-process-environment.ts';
 export * from './exchange.ts';
 export * from './inherited-ipc.ts';
 export * from './ipc.ts';
