@@ -92,11 +92,11 @@
 @memory ../memories/teleport/broker/broker-local-recipe-integration-and-bundling.md
 @memory ../memories/teleport/broker/broker-recipe-parity-provenance-and-cutover.md
 @memory ../memories/teleport/broker/broker-inherited-ipc-v1-contract.md
-@memory ../memories/teleport/broker/broker-pm2-mise-runtime-contract.md
+@memory ../memories/teleport/broker/broker-host-owned-pm2-prerequisite.md
 @memory ../memories/teleport/broker/broker-cooperative-bootstrap-entrypoint.md
 @memory ../memories/teleport/broker/broker-windows-process-tree-conformance.md
 @accept Adopt the implemented `pk` recipe parsing, parameter resolution, receiver-specific leaf execution, preflight, exact-name lifecycle, structured status/events, bounded output tails, stream facts, probe/readiness, timeout/cleanup, orphan/stale reporting, and heartbeat tick/tock cursor concepts.
-@accept PM2 is the required Windows V1 backend receiver for every agent-launched recipe, including one-shot, bounded foreground, intentionally long-lived, and service commands. `direct` is an internal bootstrap/test seam only and is not an unbounded public execution path.
+@accept PM2 is the required Windows V1 backend receiver for every agent-launched recipe, including one-shot, bounded foreground, intentionally long-lived, and service commands. V1 assumes a compatible PM2 daemon is already running as host-owned infrastructure; Nebular does not install, start, stop, restart, upgrade, save, resurrect, or otherwise manage the daemon.
 @accept The backend-neutral `ProcessReceiver` contract admits PM2 first and later systemd, launchd, containers, schedulers, or other supervisors without changing recipe, broker, heartbeat, or agent-facing lifecycle semantics.
 @accept Avoid Hono, localhost, a persistent broker service, and a resident per-process Bun wrapper in V1. `recipe-runner.js` uses short-lived broker operations over inherited Bun IPC; PM2 directly materializes and manages the requested command.
 @accept Keep observation outside a resident wrapper: combine PM2 exact-name state/logs/restarts, output cursors, declared probes, process facts, recipe progress signals, and agent/control-side monotonic evaluation. Cooperative applications may emit heartbeat/progress facts without becoming a second supervisor.
@@ -107,7 +107,7 @@
 @accept Continue proving generic recipe behavior in Bake while its recipe package remains coupled, then freeze an admitted kernel and transplant its TypeScript source plus fixtures into this workspace. Do not import `@bake/recipe`, a compiled Bake bundle, or Bake workspace paths at runtime or build time.
 @accept After transplant, wx-teleport-cartridge owns its recipe kernel and broker extensions. Layered local TypeScript is bundled independently into `recipe-runner.js` and `broker.js`; shared recipe code may be duplicated across those artifacts because an undeclared shared runtime chunk is forbidden.
 @accept Use inherited Bun IPC with a versioned bounded one-request protocol for short-lived runner/broker control. Use a distinct narrowly typed secret-bearing bootstrap exchange only during authorized target initialization; never mix secret payloads into ordinary status, audit, journal, or observation envelopes.
-@accept Pin PM2 as an exact local dependency and run its Node-owned daemon/tooling only through the Mise-pinned Node runtime. Broker implementation remains Bun-only; no global Node, npm, PM2, or ambient PATH dependency is admitted.
+@accept Do not add PM2 or Node as a Nebular package dependency for V1. The receiver adapter probes the already-running host PM2 service and returns a typed prerequisite failure when it is absent, unreachable, or incompatible; remediation remains outside Nebular.
 @accept Run Windows PM2 tree-cleanup proof before receiver implementation expands. Failure to prove exact descendant cleanup disqualifies PM2 for the affected lifecycle contract and must not be repaired with a resident per-target wrapper.
 @accept No recipe is operationally unbounded: one-shot attempts require a completion deadline; long-lived/service attempts require startup/readiness bounds, liveness or stall policy, observation heartbeat, cancellability, and exact stop/delete semantics. Intentional indefinite service lifetime does not mean unbounded startup, silence, failure, or cleanup.
 @accept A secret-bearing managed attempt retains an active secret lease for its process lifetime. Grant expiry or revocation blocks reuse and triggers the recipe's exact safe-stop/delete policy; recipes without a safe termination policy cannot receive an expiring secret lease in V1.
@@ -234,9 +234,9 @@
 @memory ../memories/teleport/broker/broker-capability-specific-ports.md
 @memory ../memories/teleport/broker/broker-sqlite-nonsecret-authority-journal.md
 @memory ../memories/teleport/broker/broker-inherited-ipc-v1-contract.md
-@memory ../memories/teleport/broker/broker-pm2-mise-runtime-contract.md
+@memory ../memories/teleport/broker/broker-host-owned-pm2-prerequisite.md
 @memory ../memories/teleport/broker/broker-windows-process-tree-conformance.md
-@blocker Complete the closed contracts and prove inherited Bun IPC, PM2 direct materialization, external observation, cooperative credential bootstrap, and Windows exact-tree cleanup. Final package bin aliases are a packaging decision and do not block domain or broker-core implementation.
+@blocker Complete the closed contracts and prove inherited Bun IPC, already-running PM2 preflight/direct materialization, external observation, cooperative credential bootstrap, and Windows exact-tree cleanup. Final package bin aliases are a packaging decision and do not block domain or broker-core implementation.
 @accept Run broker control as short-lived Bun child processes over inherited IPC. Do not start a local HTTP server, open a TCP listener, or require singleton endpoint discovery in V1.
 @accept Implement create, resolve, lease, revoke, expire, enumerate-redacted, and rotate-reference operations through the broker-owned `SecretStore` port backed initially by `Bun.secrets`.
 @accept Derive stable, collision-resistant Bun `service` and `name` identifiers from the broker namespace and opaque credential reference; keep provider, project, scope, and expiry metadata outside the secret value and never use secret content as an identifier.
@@ -364,7 +364,7 @@
 @accept Prove `teleport.js` loads and passes its golden CAR vector in a real supported browser and in the pinned Bun runtime without resolving broker or keychain modules.
 @accept Prove `broker-client.js` imports without starting a listener, opening consent UI, reading the keychain, or importing privileged broker modules.
 @accept Prove `recipe-runner.js` cannot read `Bun.secrets`, construct a secret environment, or authorize its own repository/recipe claims; prove broker-side revalidation rejects repository, recipe-revision, credential-slot, expiry, or grant drift while ordinary interpreted source and package-manifest changes remain runnable.
-@accept Prove `broker.js` runs through Mise and the pinned Bun runtime, exchanges versioned messages over inherited Bun IPC, controls PM2 through bounded exact-name direct materialization, observes and cancels managed commands without a resident wrapper, uses the real `Bun.secrets` adapter for cooperative bootstrap, and performs encrypted credential CAR export/import.
+@accept Prove `broker.js` runs through Mise and the pinned Bun runtime, exchanges versioned messages over inherited Bun IPC, uses an already-running host PM2 daemon through bounded exact-name application operations without managing daemon lifecycle, observes and cancels managed commands without a resident wrapper, uses the real `Bun.secrets` adapter for cooperative bootstrap, and performs encrypted credential CAR export/import.
 @accept Install the built package into isolated consumer fixtures and prove all four package subpath exports plus declaration resolution without falling back to workspace source files.
 @accept Scan the four artifacts, declarations, optional maps, build logs, and fixtures for embedded credentials and reject unexpected absolute workspace paths or secret-bearing literals.
 

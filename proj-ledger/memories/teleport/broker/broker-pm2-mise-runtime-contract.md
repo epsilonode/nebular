@@ -1,7 +1,7 @@
 ---
 id: broker-pm2-mise-runtime-contract
 kind: contract
-status: proposed
+status: superseded
 created: 2026-08-23
 updated: 2026-08-23
 roadmap: broker
@@ -11,9 +11,12 @@ refs:
   - memories/teleport/broker/broker-direct-receiver-materialization.md
   - memories/teleport/broker/broker-process-receiver-algebra.md
 hook: "read before installing or invoking PM2, deciding whether PM2 runs under Node or Bun, changing Mise Node/Bun pins, using bunx or global PM2, or implementing the PM2 receiver adapter"
+superseded_by: broker-host-owned-pm2-prerequisite
 ---
 
 # PM2 Mise Runtime Contract
+
+@supersession Historical proposal only. `broker-host-owned-pm2-prerequisite` replaces local PM2 dependency, daemon ownership, startup, version pinning, and PM2_HOME management with an already-running host prerequisite.
 
 @decision PM2 is an exact local dependency and the Windows V1 receiver daemon is owned by the workspace's Mise-pinned Node runtime. Broker/client/runner implementation remains Bun-targeted. Node exists as receiver infrastructure, not an ambient developer PATH dependency or supported broker runtime.
 @current The workspace currently pins Node `22.23.2` and Bun `1.3.14` in `mise.toml`. Treat those as the initial proof matrix, not permission to float either version. Bake's ranged PM2 dependency and `bunx pm2` recipe are evidence to audit, not the final reproducible installation contract.

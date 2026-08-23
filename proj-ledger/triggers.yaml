@@ -41,9 +41,9 @@ must_know:
   broker_direct_receiver:
     path: memories/teleport/broker/broker-direct-receiver-materialization.md
     read_before: [PM2 role, direct materialization, PM2 config, PM2 restart, PM2 exact name, process subtree, wrapper overhead, credential bootstrap]
-  broker_pm2_mise_runtime:
-    path: memories/teleport/broker/broker-pm2-mise-runtime-contract.md
-    read_before: [PM2 install, PM2 version, Node for PM2, Mise Node, global PM2, bunx pm2, PM2 daemon runtime]
+  broker_host_pm2_prerequisite:
+    path: memories/teleport/broker/broker-host-owned-pm2-prerequisite.md
+    read_before: [PM2 install, PM2 dependency, PM2 version, Node for PM2, global PM2, PM2 daemon runtime, PM2 already running, PM2 prerequisite, PM2_HOME]
   broker_windows_tree_proof:
     path: memories/teleport/broker/broker-windows-process-tree-conformance.md
     read_before: [Windows process tree, PM2 tree kill, descendant cleanup, cancellation proof, orphan child, taskkill, Job Object fallback]
