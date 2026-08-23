@@ -40,6 +40,11 @@ run = "bun run verify:artifacts"
 description = "Resolve all four package declaration surfaces from a consumer fixture"
 run = "bun run verify:declarations"
 
+[tasks.verify-installed]
+description = "Pack and install Nebular into an isolated consumer and prove all four runtime/type surfaces"
+depends = ["build"]
+run = "bun run verify:installed"
+
 [tasks.verify-lint-policy]
 description = "Prove the hard-FP and authority-boundary rules with negative fixtures"
 run = "bun run verify:lint-policy"

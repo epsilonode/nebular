@@ -69,9 +69,10 @@
     "build": "bun run build:runtime && bun run build:types",
     "verify:declarations": "tsc --noEmit -p tsconfig.package-consumer.json",
     "verify:artifacts": "bun tooling/verify-artifacts.ts",
+    "verify:installed": "bun tooling/verify-installed-package.ts",
     "verify:lint-policy": "bun tooling/verify-lint-policy.ts",
     "verify:type-policy": "tsc --noEmit -p tsconfig.type-negative.json",
-    "verify": "bun run check && bun run verify:lint-policy && bun run verify:type-policy && bun run build && bun run verify:declarations && bun run verify:artifacts"
+    "verify": "bun run check && bun run verify:lint-policy && bun run verify:type-policy && bun run build && bun run verify:declarations && bun run verify:artifacts && bun run verify:installed"
   },
   "dependencies": {
     "@ipld/car": "5.4.7",
