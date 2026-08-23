@@ -86,6 +86,9 @@ must_know:
   capability_contracts:
     path: memories/teleport/contracts/teleport-layer-1-capability-contracts.md
     read_before: [capability ids, schema versions, instance identity, dependencies, security classes]
+  test_topology:
+    path: memories/teleport/contracts/teleport-colocated-domain-seam-vitest.md
+    read_before: [test organization, colocated test, Vitest project, seam suite, seam test, live test, domain test, test naming, coverage, JUnit]
   codec_kernel:
     path: memories/teleport/contracts/teleport-layer-2-codec-kernel.md
     read_before: [codec interfaces, canonical encoding, migrations, registry dispatch, decode budgets, conformance]

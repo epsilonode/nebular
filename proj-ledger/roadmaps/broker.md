@@ -149,6 +149,7 @@
 ## @tier8 implementation sequence
 
 ### @work @active hard FP tooling and fast migration
+@memory ../memories/teleport/contracts/teleport-colocated-domain-seam-vitest.md
 @memory ../memories/teleport/broker/broker-hard-fp-enforcement-policy.md
 @memory ../memories/teleport/broker/broker-eslint-flat-config-specification.md
 @memory ../memories/teleport/broker/broker-typescript-project-and-compiler-matrix.md
@@ -161,6 +162,7 @@
 @accept Pin the complete type-aware ESLint, functional, boundaries, TypeScript, and runtime FP dependency set; no security-sensitive dependency uses an unbounded or floating version.
 @accept Add self-contained flat-config profiles and negative lint fixtures before migrating source, including parser services and explicit pure/adapter/Svelte/test/tooling ownership.
 @accept Split compiler projects and ambient types before broker adapters land; add exact artifact import topology and default-disallow dependency policies.
+@accept Give every Broker domain a named conservative Vitest project with colocated atomic tests; reserve `.seam.test.ts` for precise public-boundary composition and `.live.test.ts` for explicit host-dependent proof.
 @accept Migrate result/error composition, identifiers, codecs, state machines, restore execution, and effect ports in the linked dependency order, removing old expected-failure APIs in the same bounded slice.
 @accept Complete each associated workspace independently from the specifications here; do not import or point at an external project's configuration as the implementation contract.
 @proof_gap No ESLint configuration, separate compiler projects, pinned FP runtime dependencies, negative enforcement fixtures, or hard-migration baseline exists yet in this workspace.
@@ -369,6 +371,7 @@
 @accept Scan the four artifacts, declarations, optional maps, build logs, and fixtures for embedded credentials and reject unexpected absolute workspace paths or secret-bearing literals.
 
 ### @proof @open FP and tooling conformance
+@memory ../memories/teleport/contracts/teleport-colocated-domain-seam-vitest.md
 @memory ../memories/teleport/broker/broker-eslint-flat-config-specification.md
 @memory ../memories/teleport/broker/broker-typescript-project-and-compiler-matrix.md
 @memory ../memories/teleport/broker/broker-fp-runtime-package-contract.md
@@ -380,6 +383,7 @@
 @memory ../memories/teleport/broker/broker-domain-algebra-implementation-sequence.md
 @accept Prove type-aware lint actually executes every configured rule, emits zero warnings, and rejects negative fixtures for mutation, ambient effects, promise misuse, nonexhaustive state, expected-failure throws, and forbidden import direction.
 @accept Prove all compiler projects independently pass with their minimal ambient types and isolated consumer fixtures resolve all public declarations without source aliases or privileged leakage.
+@accept Prove named atomic projects, cross-domain seam projects, and opt-in live projects select each test exactly once and preserve conservative deterministic execution.
 @accept Prove neverthrow warning/error composition laws, Result-to-Effect boundary helpers, Effect finalization under failure/interruption, redacted outcome projection, and absence of mixed rejected-promise control flow.
 @accept Record and eliminate the temporary migration inventory; retain only justified path-scoped adapter/test/tooling exceptions with their exact disabled rules and proof.
 @accept Prove scope, time, authority, report, Result, reducer, replay, plan, rollback, redaction, and codec laws through bounded generated tests and prove illegal trust/authority/exposure combinations through compile-negative fixtures.

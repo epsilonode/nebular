@@ -9,7 +9,12 @@
   },
   "scripts": {
     "check": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --project configuration --project kernel --project restore --project seam",
+    "test:kernel": "vitest run --project kernel",
+    "test:restore": "vitest run --project restore",
+    "test:seam": "vitest run --project seam",
+    "test:live": "vitest run --project live --passWithNoTests",
+    "test:coverage": "vitest run --coverage",
     "verify": "bun run check && bun run test"
   },
   "dependencies": {
@@ -19,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "22.15.21",
+    "@vitest/coverage-v8": "4.1.6",
     "typescript": "5.8.3",
     "vitest": "4.1.6"
   }

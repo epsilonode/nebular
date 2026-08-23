@@ -133,11 +133,14 @@
 
 ### @proof @active codec conformance and adversarial matrix
 @memory ../memories/teleport/contracts/teleport-codec-conformance-harness.md
+@memory ../memories/teleport/contracts/teleport-colocated-domain-seam-vitest.md
 @memory ../memories/teleport/contracts/teleport-layer-2-codec-kernel.md
 @accept A reusable conformance harness runs against every registered codec and proves canonical byte/CID stability, strict unknown-field behavior, round-trip equality, input immutability, budget enforcement, migration completeness, typed failures, dependency projection, and absence of effects during decode.
 @accept Cross-runtime fixtures execute in Node/Bun and supported browsers; browser-only or Node-only behavior is a codec-boundary failure unless the capability explicitly contains raw foreign bytes handled by an application adapter.
 @accept Adversarial cases include malformed DAG-CBOR, duplicate semantic keys, invalid UTF-8, non-finite numbers, oversized nesting/collections/strings, hash mismatch, version confusion, migration gaps, dependency cycles, opaque optional relay, required-unknown rejection, and secret-marker leakage.
 @accept JTWC and wx-ui-melt acceptance additionally proves multiple same-id capability instances remain isolated by instance identity and restore into the intended panes without state crossover.
+@evidence 2026-08-23 Local tests now follow named conservative Vitest projects: colocated kernel and restore atomic suites, configuration-policy proof, and dedicated protected-restore plus cartridge-cloud seam suites. `mise run verify` passes 5 files and 41 tests with JUnit/JSON reports ignored under `reports/`.
+@note The former `tests/core.test.ts` is now colocated as `src/cartridge.test.ts`; its broad describe groups remain explicit split inventory as narrower source domains are introduced, not precedent for a permanent core-test bucket.
 
 ### @work @active composable wx-ui-melt workspace cartridges
 @memory ../memories/teleport/contracts/teleport-workspace-composition.md

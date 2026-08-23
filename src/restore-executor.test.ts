@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { err, executeTeleportRestorePlan, ok, type TeleportRestorePlan } from '../src';
+import { err, executeTeleportRestorePlan, ok, type TeleportRestorePlan } from './index';
 
 const plan: TeleportRestorePlan = {
   steps: [

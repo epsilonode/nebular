@@ -40,7 +40,7 @@ import {
   verifyTeleportGoldenVectorV1,
   writeTeleportCartridge,
   type TeleportCapabilityCodec
-} from '../src';
+} from './index';
 
 interface FixtureValue {
   readonly count: number;
