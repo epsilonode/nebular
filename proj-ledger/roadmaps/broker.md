@@ -1,15 +1,15 @@
 # Development Credential Broker Roadmap
 
 @roadmap broker
-@updated 2026-09-04
+@updated 2026-09-05
 @meta name=roadmap-format content="../format-guidance.md"
-@meta name=roadmap-status content="active"
+@meta name=roadmap-status content="deferred"
 @meta name=owner-project content="R:/Code/web/wx-teleport-cartridge"
 @meta name=implementation-boundary content="independent packages and privileged broker process"
 @meta name=related-roadmap content="car-teleport.md"
 @meta name=required-runtime content="Bun through Mise"
 @meta name=planned-public-upstream content="https://github.com/epsilonode/nebular"
-@note This roadmap defines a local-development credential broker within wx-teleport-cartridge. It reuses Teleport contracts, codecs, protection, and CAR transport while remaining an independently loadable security boundary; the OS credential store is authoritative for live secret material.
+@note This roadmap defines an optional local-development credential broker within wx-teleport-cartridge. Browser Teleport import/export is the primary product and is governed by `car-teleport.md`; this Bun-only broker is not a browser runtime dependency or a prerequisite for browser package release, consumer migration, or CAR transfer between browser profiles.
 
 ## @tier9 active architecture and security boundary
 
@@ -302,19 +302,6 @@
 @accept Clients reconnect safely, handle broker upgrades and lease expiry, and never cache secrets beyond the authorized operation lifetime.
 @accept Conformance proves unrelated project roots, expired grants, broader scopes, and environment/account mismatches cannot reuse a grant.
 
-### @work @open add browser broker client and authenticated bridge
-@memory ../memories/teleport/broker/broker-browser-client-transport-and-trust.md
-@memory ../memories/teleport/broker/broker-browser-client-public-surface-and-conformance.md
-@memory ../memories/teleport/broker/broker-epsilonode-nebular-esm-distribution.md
-@memory ../memories/teleport/broker/broker-four-artifact-type-boundaries.md
-@decision A real browser client is an additive, separately named public artifact; it does not reclassify or weaken the existing Bun/inherited-IPC `broker-client` surface. Its public-path, package-export, declaration, artifact-count, and release-version change are explicit admission work rather than an accidental fifth output.
-@blocker V1 broker control uses short-lived inherited Bun IPC and deliberately has no local HTTP/TCP listener or endpoint discovery. A browser cannot use that carrier, so no implementation begins until a broker-owned browser bridge has an approved transport, authentication, origin-binding, pairing, lifetime, revocation, and hostile-local-user threat contract.
-@accept The browser entrypoint builds with the browser target and can name only browser-safe APIs plus portable/client contracts. Import, declaration, and artifact gates reject Bun, Node process/filesystem, keychain, child-process, recipe-runner, privileged broker, bootstrap-environment, and secret-delivery edges.
-@accept The browser API carries typed, bounded intents and redacted progress/terminal outcomes only. The broker independently derives and revalidates every repository, recipe, scope, account/environment, grant, consent, and lifecycle fact; browser claims, labels, origin text, and returned handles are never authority.
-@accept Pair a browser origin and current user session through an explicit broker-mediated ceremony with narrow expiry, replay resistance, cancellation/revocation, and no ambient localhost discovery. Raw credentials, credential plaintext, secret-bearing environment patches, cooperative bootstrap, and privileged recipe launch remain unavailable to browser code.
-@accept Prove real-browser import and request/status/cancel behavior; allowed-origin success; wrong-origin, stale/replayed pairing, unauthenticated local peer, malformed/oversized message, broker restart, disconnect, cancellation, revocation, and expiry failure; no secret in DOM, browser storage, URL, console, network diagnostics, bundle, source map, or terminal receipt.
-@accept Publish only after the bridge and browser artifact pass isolated package, immutable CDN/ref, and real-browser conformance. esm.sh may deliver a pinned released browser-safe artifact, but it is not the bridge, authentication mechanism, or source of authority.
-
 ### @work @deferred extract and localize the Bake recipe kernel
 @memory ../memories/teleport/broker/broker-pk-recipe-runner-adoption.md
 @memory ../memories/teleport/broker/broker-bake-recipe-kernel-extraction.md
@@ -348,7 +335,7 @@
 @memory ../memories/teleport/broker/broker-four-artifact-type-boundaries.md
 @memory ../memories/teleport/broker/broker-typing-fp-implementation-sequence.md
 @memory ../memories/teleport/broker/broker-epsilonode-nebular-esm-distribution.md
-@blocker Run the real browser golden vector, finish the intended CLI/bin surfaces, close the real installed four-artifact broker/PM2/keychain E2E, and publish an immutable package release before calling distribution complete. On 2026-09-05 `https://esm.sh/@epsilonode/nebular@0.1.0` returned HTTP 404, so consumers cannot yet resolve a compiled package artifact by version.
+@blocker The browser portable release needs the real browser golden vector and one published immutable package version; on 2026-09-05 `https://esm.sh/@epsilonode/nebular@0.1.0` returned HTTP 404. CLI/bin and installed broker/PM2/keychain E2E remain separate optional Bun-product gates and cannot delay browser package release.
 @evidence GitHub reports `https://github.com/epsilonode/nebular` as PUBLIC with default branch `main`, matching the configured `origin` and package identity `@epsilonode/nebular`. Four thin root `.ts` entrypoints, conditional package exports, separate declarations, Mise/Bun builds with splitting disabled, and graph verification exist. `mise run verify` emits exactly `teleport.js`, `broker-client.js`, `recipe-runner.js`, and `broker.js`, resolves all four subpaths through an isolated consumer, and rejects any fifth export, undeclared chunk, privileged edge, old workspace pointer, absolute source path, or credential-shaped literal. `tooling/verify-installed-package.ts` additionally packs and installs the package into a fresh temporary consumer outside the workspace, rejects linked or escaped package resolution, independently typechecks the four installed declarations, runtime-imports all four subpaths, and proves their resolutions end at the installed `dist/*.js` files; the standalone proof observed export counts `[59, 48, 27, 152]` from a 761531-byte tarball. The verified implementation series is pushed and all four source entrypoints return HTTP 200 JavaScript from esm.sh at immutable commit `a97d66c0eb3bb8cdc3f9e7e8cb9b423a43bc2633` with repository-internal imports pinned to that same ref.
 @accept Add root TypeScript entrypoints `teleport.ts`, `broker-client.ts`, `recipe-runner.ts`, and `broker.ts`; internal modules remain layered and are not individually exposed as stable esm.sh paths.
 @accept Add Mise-managed Bun build tasks for the portable artifact, broker artifacts, complete distribution, and distribution verification. No build or package command bypasses Mise.

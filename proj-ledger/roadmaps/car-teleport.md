@@ -1,7 +1,7 @@
 # CAR Teleport And Capability Cartridge Roadmap
 
 @roadmap car-teleport
-@updated 2026-09-04
+@updated 2026-09-05
 @meta name=roadmap-format content="../format-guidance.md"
 @meta name=memory-format content="../making-memories.md"
 @meta name=roadmap-status content="deferred"
@@ -184,13 +184,28 @@
 @accept Streaming and selective reads may replace bounded whole-object buffering without changing capability bytes, CIDs, protection envelopes, manifests, or restore behavior; CAR v2 indexing remains optional while its specification is draft.
 @evidence 2026-09-04 The passing transport and cartridge seam suites prove bounded stream ingestion, CAR graph preservation, immutable child-first publication, conditional heads, checksums, and tenant-scoped object-store policy.
 
+### @work @open browser-first portable cartridge delivery
+@memory ../memories/teleport/contracts/browser-teleport-import-export-contract.md
+@memory ../memories/teleport/contracts/browser-teleport-cdn-consumer-conformance.md
+@memory ../memories/teleport/contracts/teleport-layer-6-application-adapters.md
+@memory ../memories/teleport/contracts/portable-car-security.md
+@decision @accepted The browser is the ultimate Teleport Cartridge consumer. The existing portable root `teleport.ts`/`teleport.js` is the sole browser-facing package surface; Bun is build tooling only and the optional broker, recipe runner, keychain, PM2, and process features are neither loaded nor required for browser import/export.
+@accept The browser release package exposes the portable root only. Before publication, remove or defer nonportable package exports rather than distribute Bun-oriented entrypoints beside the browser artifact; optional broker experiments remain source-only/deferred and cannot impose runtime, build, verification, or release dependencies on browser consumers.
+@blocker The browser-ready package is not published: on 2026-09-05 `https://esm.sh/@epsilonode/nebular@0.1.0` returned HTTP 404. Consumers therefore still resolve linked workspace source instead of one immutable compiled portable artifact.
+@blocker The current manifest/build still declares four entrypoints and includes source plus Bun artifacts in the package inventory. Reduce the published browser package to the portable runtime/declaration/metadata set and replace the four-artifact verification with a portable-only package/CDN gate before release.
+@accept Each application browser profile owns its NanoStore and Fireproof documents as the source of truth. Its adapter projects selected state to its capability codecs, calls the neutral export/import and restore-plan interfaces, and owns all framework/store mutation, file-picker/download, confirmation, and visible progress UI.
+@accept The generic browser flow is deliberately small: choose export -> assemble/optionally protect/download a CAR; choose import -> parse/verify/unlock -> inspect the restore plan -> application-confirmed execute/rollback. No Bun/Node API, broker bridge, browser-local privileged service, secret delivery, recipe execution, or application-store import may enter the portable graph.
+@accept Browser applications externalize the bare portable `@epsilonode/nebular` import and resolve it through one pinned published-package CDN import-map URL. They may install that exact version only for declarations/type checking; they never use `link:`, `file:`, GitHub TypeScript source URLs, workspace paths, or an application-bundled copy in production output.
+@accept Prove a clean source browser profile exports representative NanoStore and Fireproof-backed documents, and a separate clean browser profile imports the CAR through the application restore adapter. Verify canonical CAR integrity, intended state restoration, unknown optional retention, user cancellation, wrong protection key, rollback/recovery, no Bun/Node/polyfill edge, no browser-source fallback, and no credential/plaintext leakage into UI, storage, URL, console, bundle, or source map.
+@accept Release browser support through the browser-only gate: browser-target build, declaration/package proof, published immutable package version, CDN/import-map resolution, and the cross-profile browser fixture. Optional Bun artifact/E2E work is tracked separately and cannot delay this browser release.
+
 ### @proof @deferred cross-project round-trip and compatibility matrix
 @memory ../memories/teleport/contracts/teleport-cross-project-ownership.md
 @memory ../memories/teleport/contracts/teleport-layer-6-application-adapters.md
 @accept A clean-profile browser exports a multi-pane wx-ui-melt workspace containing JTWC HUD intent, imports it in another clean profile, rebuilds layout, rebases each HUD against a fresh authoritative scene, and reports unresolved capabilities without data loss.
 @accept Retain focused proof for canonical DAG-CBOR determinism, CID corruption, missing/extra blocks, unknown required/optional capabilities, migration chains, wrong passphrase, capability redaction, interruption cleanup, and transactional rollback.
 @accept Supa Svelte owns provider/Fireproof codecs, JTWC owns HUD codecs, wx-ui-melt owns workspace composition, and a neutral shared package owns the outer transport and orchestration contracts.
-@note Paused pending consumer-owned migration and proof. JTWC, wx-ui-melt, and supa-svelte currently import `@wx/teleport-cartridge`, whereas this package now publishes `@epsilonode/nebular`; their owners must update dependencies/imports and run their clean-profile/browser and durable-host acceptance gates in their own workspaces.
+@note Paused pending consumer-owned migration and proof. JTWC, wx-ui-melt, and supa-svelte currently import `@wx/teleport-cartridge`, whereas browser delivery requires a published `@epsilonode/nebular` package and one pinned external import-map version; their owners must remove link/file/source fallback, update dependencies/import maps/lockfiles, and run clean-profile browser acceptance in their own workspaces.
 
 ## @tier0 completion and handoff
 
