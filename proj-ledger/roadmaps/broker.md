@@ -302,6 +302,19 @@
 @accept Clients reconnect safely, handle broker upgrades and lease expiry, and never cache secrets beyond the authorized operation lifetime.
 @accept Conformance proves unrelated project roots, expired grants, broader scopes, and environment/account mismatches cannot reuse a grant.
 
+### @work @open add browser broker client and authenticated bridge
+@memory ../memories/teleport/broker/broker-browser-client-transport-and-trust.md
+@memory ../memories/teleport/broker/broker-browser-client-public-surface-and-conformance.md
+@memory ../memories/teleport/broker/broker-epsilonode-nebular-esm-distribution.md
+@memory ../memories/teleport/broker/broker-four-artifact-type-boundaries.md
+@decision A real browser client is an additive, separately named public artifact; it does not reclassify or weaken the existing Bun/inherited-IPC `broker-client` surface. Its public-path, package-export, declaration, artifact-count, and release-version change are explicit admission work rather than an accidental fifth output.
+@blocker V1 broker control uses short-lived inherited Bun IPC and deliberately has no local HTTP/TCP listener or endpoint discovery. A browser cannot use that carrier, so no implementation begins until a broker-owned browser bridge has an approved transport, authentication, origin-binding, pairing, lifetime, revocation, and hostile-local-user threat contract.
+@accept The browser entrypoint builds with the browser target and can name only browser-safe APIs plus portable/client contracts. Import, declaration, and artifact gates reject Bun, Node process/filesystem, keychain, child-process, recipe-runner, privileged broker, bootstrap-environment, and secret-delivery edges.
+@accept The browser API carries typed, bounded intents and redacted progress/terminal outcomes only. The broker independently derives and revalidates every repository, recipe, scope, account/environment, grant, consent, and lifecycle fact; browser claims, labels, origin text, and returned handles are never authority.
+@accept Pair a browser origin and current user session through an explicit broker-mediated ceremony with narrow expiry, replay resistance, cancellation/revocation, and no ambient localhost discovery. Raw credentials, credential plaintext, secret-bearing environment patches, cooperative bootstrap, and privileged recipe launch remain unavailable to browser code.
+@accept Prove real-browser import and request/status/cancel behavior; allowed-origin success; wrong-origin, stale/replayed pairing, unauthenticated local peer, malformed/oversized message, broker restart, disconnect, cancellation, revocation, and expiry failure; no secret in DOM, browser storage, URL, console, network diagnostics, bundle, source map, or terminal receipt.
+@accept Publish only after the bridge and browser artifact pass isolated package, immutable CDN/ref, and real-browser conformance. esm.sh may deliver a pinned released browser-safe artifact, but it is not the bridge, authentication mechanism, or source of authority.
+
 ### @work @deferred extract and localize the Bake recipe kernel
 @memory ../memories/teleport/broker/broker-pk-recipe-runner-adoption.md
 @memory ../memories/teleport/broker/broker-bake-recipe-kernel-extraction.md

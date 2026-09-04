@@ -3,7 +3,7 @@ id: broker-four-artifact-type-boundaries
 kind: contract
 status: proposed
 created: 2026-08-23
-updated: 2026-08-23
+updated: 2026-09-05
 roadmap: broker
 refs:
   - roadmaps/broker.md#four-typescript-upstream-entrypoints
@@ -15,6 +15,7 @@ hook: "read before changing entrypoints, tsconfig projects, package exports, Bun
 # Four-Artifact Type And Compiler Boundaries
 
 @contract Maintain layered TypeScript source and expose exactly four stable public entrypoints from `epsilonode/nebular`: portable `teleport.ts`, unprivileged `broker-client.ts`, unprivileged `recipe-runner.ts`, and Bun-only privileged `broker.ts`; reproducible standalone `.js` bundles remain supported build artifacts.
+@evolution A future browser broker client is a separately named additive public surface, not a browser reinterpretation of `broker-client.ts`. It may change the four-entrypoint/artifact contract only through the browser-client roadmap item, coordinated exports/declarations/build inventory/release manifest updates, and browser-specific authority proof.
 @contract Use separate compiler projects for portable Teleport, broker client, recipe runner, privileged broker, and tests, all extending one strict base configuration. Do not give every source file combined DOM, Node, Bun, and test ambient types.
 @contract The portable compiler environment admits only the platform contracts deliberately supported by `teleport.js`; the client and runner environments admit only their narrow unprivileged facilities; the broker environment admits Bun and privileged process APIs; tests own test-only globals.
 @contract Type-only imports and package direction enforce `teleport <- credential contracts/transfer codec <- broker client <- recipe runner` and `broker client/contracts <- broker domain/runtime`. Portable or unprivileged code never imports back toward broker authority.
