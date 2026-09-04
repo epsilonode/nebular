@@ -1,4 +1,5 @@
 import type { Result } from 'neverthrow';
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -198,6 +199,27 @@ const commitEffect = (transition: AuthorityGrantTransition): CommitAuthorityGran
 };
 
 describe('authority request, consent, grant, revocation, and expiry algebras', () => {
+  it('reduces generated grant-persistence events deterministically and rejects successor replay', () => {
+    fc.assert(fc.property(fc.integer({ min: 500, max: 8_999 }), atMs => {
+      const pending = pendingGrant();
+      const event = {
+        type: 'grant-persisted' as const,
+        operationId: pending.facts.command.operationId,
+        grantId: pending.facts.command.grant.id,
+        at: instant(atMs)
+      };
+      const first = reduceAuthorityGrant(pending, event);
+      const second = reduceAuthorityGrant(pending, event);
+      expect(first).toEqual(second);
+      expect(first).toMatchObject({ type: 'ok', value: { state: { state: 'active' }, terminal: null } });
+      if (first.type === 'err') return;
+      expect(reduceAuthorityGrant(first.value.state, event)).toMatchObject({
+        type: 'err',
+        issues: [{ code: 'grant-transition-invalid' }]
+      });
+    }));
+  });
+
   it('constructs bounded temporal and authority primitives without ambient time', () => {
     expect(parseAuthorityInstant(-1).type).toBe('err');
     expect(parseAuthorityInstant(1.5).type).toBe('err');

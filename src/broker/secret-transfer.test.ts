@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -161,6 +162,41 @@ describe('secret-transfer capability codec', () => {
 });
 
 describe('secret-transfer planning algebra', () => {
+  it('is deterministic while fresh and rejects generated consumed-transfer replays before commit planning', () => {
+    const scopes = fc.uniqueArray(fc.constantFrom('alerts:read', 'forecast:read'), {
+      minLength: 1,
+      maxLength: 2
+    });
+    fc.assert(fc.property(scopes, fc.integer({ min: 1_000, max: 4_999 }), (permittedScopes, atMs) => {
+      const facts = secretTransferPortableFacts({
+        ...fixtureCapability(),
+        providerScopes: ['forecast:read', 'alerts:read']
+      });
+      const destination = destinationFixture();
+      const authorized: AuthorizedSecretTransferDestination = {
+        ...destination.authorized,
+        permittedScopes
+      };
+      const input = {
+        facts,
+        recipientKeyId: facts.intendedRecipientKeyId,
+        atMs,
+        replayStatus: 'fresh' as const,
+        destinationRequest: destination.request,
+        destination: authorized,
+        destinationStatus: 'absent' as const
+      };
+      const first = planSecretTransferImport(input);
+      const second = planSecretTransferImport(input);
+      expect(first).toEqual(second);
+      expect(first).toMatchObject({ type: 'ok', value: { state: 'ready-to-commit' } });
+      expect(planSecretTransferImport({ ...input, replayStatus: 'consumed' })).toMatchObject({
+        type: 'err',
+        issues: [{ code: 'transfer-replayed' }]
+      });
+    }));
+  });
+
   it('admits only a fresh, recipient-matched, locally narrower destination authority', () => {
     const facts = secretTransferPortableFacts(fixtureCapability());
     const destination = destinationFixture();

@@ -146,7 +146,7 @@
 @accept Adversarial cases include malformed DAG-CBOR, duplicate semantic keys, invalid UTF-8, non-finite numbers, oversized nesting/collections/strings, hash mismatch, version confusion, migration gaps, dependency cycles, opaque optional relay, required-unknown rejection, and secret-marker leakage.
 @accept JTWC and wx-ui-melt acceptance additionally proves multiple same-id capability instances remain isolated by instance identity and restore into the intended panes without state crossover.
 @evidence 2026-08-23 Local tests now follow named conservative Vitest projects: colocated kernel and restore atomic suites, configuration-policy proof, and dedicated protected-restore plus cartridge-cloud seam suites. `mise run verify` passes 5 files and 41 tests with JUnit/JSON reports ignored under `reports/`.
-@evidence 2026-09-04 `mise run verify` passes the expanded conformance, adversarial, protection, transport, restore, and seam suites: 826 tests in 101 files with current JUnit/JSON reports.
+@evidence 2026-09-04 `mise run verify` passes the expanded conformance, adversarial, protection, transport, restore, and seam suites: 828 tests in 101 files with current JUnit/JSON reports.
 @evidence 2026-09-04 Bounded fast-check canonical-codec laws now generate valid public fixture values with opposite source-object insertion order and prove identical DAG-CBOR bytes/CIDs plus decode-to-reencode byte/CID idempotence. `mise exec -- bun run check:teleport` passes 60 tests in 7 files.
 @note The former `tests/core.test.ts` is now colocated as `src/cartridge.test.ts`; its broad describe groups remain explicit split inventory as narrower source domains are introduced, not precedent for a permanent core-test bucket.
 
