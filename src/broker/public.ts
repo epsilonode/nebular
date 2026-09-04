@@ -34,6 +34,7 @@ export * from './primitives.ts';
 export * from './provider-contract.ts';
 export * from './receiver.ts';
 export * from './receiver-attempt-verifier.ts';
+export * from './report.ts';
 export * from './recipe-execution-operation.ts';
 export * from './recipe-materialization-plan.ts';
 export * from './result.ts';
