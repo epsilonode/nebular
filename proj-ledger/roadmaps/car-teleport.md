@@ -1,10 +1,10 @@
 # CAR Teleport And Capability Cartridge Roadmap
 
 @roadmap car-teleport
-@updated 2026-08-23
+@updated 2026-09-04
 @meta name=roadmap-format content="../format-guidance.md"
 @meta name=memory-format content="../making-memories.md"
-@meta name=roadmap-status content="active"
+@meta name=roadmap-status content="deferred"
 @meta name=memory-root content="../memories/teleport/"
 @meta name=owner-project content="R:/Code/web/wx-teleport-cartridge"
 @meta name=consumer-projects content="R:/Code/web/jtwc; R:/Code/web/wx-ui-melt; R:/Code/web/supa-mail-hook/supa-svelte"
@@ -29,7 +29,7 @@
 @accept Fireproof is an application-owned native snapshot/store adapter at Layer 6; its exact encrypted chunks may be retained as raw capabilities protected by Layer 3. Fireproof is not the universal codec, cartridge graph, or cloud transport. S3/object storage is a Layer 7 port over opaque verified blocks and mutable publication heads.
 @accept The current provider CAR is retained as a bounded compatibility fixture and native-recovery proof; it does not define the universal schema, codec, security, restore, or transport seams.
 
-### @work @active execute implementation in dependency order
+### @work @done execute implementation in dependency order
 @memory ../memories/teleport/contracts/teleport-layer-1-capability-contracts.md
 @memory ../memories/teleport/contracts/teleport-layer-2-codec-kernel.md
 @memory ../memories/teleport/contracts/teleport-layer-3-protection-profiles.md
@@ -49,6 +49,7 @@
 @accept Phase 10 adds separately labeled JTWC exact replay, semantic provider settings, assets, and exact-pinned Fireproof native snapshot adapters only after semantic workspace restoration passes.
 @accept Phase 11 adds bounded streaming, portable-file CAR, and cloud/S3 block transport with immutable child-first publication, conditional mutable heads, checksums, tenant isolation, and reachability-based retention.
 @accept Phase 12 adds optional signatures, recipient encryption, device/account key providers, private inventory, and advanced key rotation after the base protected round trip is stable.
+@closed 2026-09-04 evidence="`mise run verify` passes the complete neutral package gate: 814 tests in 96 files, strict lint/type/policy checks, the four artifact build, declaration validation, artifact inventory, and an isolated installed-tarball consumer."
 @evidence 2026-08-22 phases 1-5 have landed in `R:/Code/web/wx-teleport-cartridge`: closed capability types, canonical DAG-CBOR/raw codecs, exact registry dispatch, explicit migration-chain validation, reusable conformance, real CAR graph verification, and opaque required/optional behavior pass the neutral suite.
 @evidence 2026-08-22 phase 6 neutral planning/execution now covers authorization, all-step staging, commit receipts, verification, reverse rollback, and cleanup; wx-ui-melt uses it for safe workspace import rather than replacing state immediately after decode.
 @evidence 2026-08-22 phases 7-10 reference codecs now exist for JTWC intent, JTWC exact replay, wx workspace layout, semantic provider settings, exact-pinned Fireproof snapshots, and raw asset blobs with linked metadata; focused cross-project suites and static checks pass.
@@ -84,7 +85,7 @@
 @accept Portable intent excludes stale provider projections, render frames, DOM/map state, request history, transactions, and derived read models.
 @accept Capability codecs are runtime-neutral, exact-versioned, pure at decode/migration boundaries, and newly emitted documents always use the current canonical schema.
 
-### @work @active define the capability codec kernel and registry
+### @work @done define the capability codec kernel and registry
 @memory ../memories/teleport/contracts/teleport-capability-contract.md
 @memory ../memories/teleport/contracts/teleport-codec-kernel-and-registry.md
 @memory ../memories/teleport/contracts/teleport-layer-2-codec-kernel.md
@@ -93,8 +94,9 @@
 @accept Registration rejects duplicate codec ownership, overlapping migration ownership, invalid capability ids, and incomplete migration paths. Cartridge assembly and verification reject invalid dependency identities, missing or mismatched required targets, duplicate dependency declarations, and hard-decode/restore-order cycles because dependencies are value-derived per capability instance.
 @accept Codec execution receives bounded bytes and an immutable capability context only; it has no ambient fetch, filesystem, browser storage, DOM, application store, credential, or arbitrary clock access.
 @accept The neutral kernel exposes opaque capability retention and restore planning but never executes application effects.
+@evidence 2026-09-04 The passing cartridge and codec suites exercise exact registry dispatch, migration-chain validation, bounded decode, opaque retention, dependency validation, and inert decode/restore planning.
 
-### @work @active specify canonical capability encoding
+### @work @done specify canonical capability encoding
 @memory ../memories/teleport/contracts/teleport-canonical-capability-encoding.md
 @memory ../memories/teleport/contracts/teleport-layer-2-codec-kernel.md
 @accept Use canonical DAG-CBOR for structured capability blocks and raw codec only for byte assets, encrypted envelopes, or foreign store chunks whose internal bytes must remain exact.
@@ -102,8 +104,9 @@
 @accept Capability payloads contain no `undefined`, functions, symbols, class instances, framework stores, mutable aliases, or implicit host objects; encoders project these into closed protocol types before canonicalization.
 @accept Encode performs validate, normalize, canonicalize, hash, and decode-round-trip verification before a capability block may enter the outer CAR.
 @accept Golden fixtures prove byte-for-byte and CID stability across Node/Bun and supported browsers.
+@evidence 2026-09-04 The passing codec, cartridge, and golden-vector suites prove canonical DAG-CBOR/raw encoding, CID stability, strict value projection, and byte/CID verification before CAR emission.
 
-### @work @active define evolution, dependencies, and opaque retention
+### @work @done define evolution, dependencies, and opaque retention
 @memory ../memories/teleport/contracts/teleport-capability-evolution-and-retention.md
 @memory ../memories/teleport/contracts/teleport-layer-1-capability-contracts.md
 @memory ../memories/teleport/contracts/teleport-layer-4-cartridge-graph.md
@@ -112,8 +115,9 @@
 @accept Unknown optional capabilities retain their original descriptor and exact bytes through import, workspace edits unrelated to them, and re-export. Unknown required capabilities block commit without being discarded.
 @accept Capability dependencies distinguish hard decode dependencies, restore-order dependencies, optional enhancement dependencies, and application availability; cycles are rejected unless an explicit aggregate capability owns the cycle.
 @accept Removal of a capability instance is an explicit workspace operation and never an incidental consequence of an unavailable codec.
+@evidence 2026-09-04 The passing cartridge suite rejects migration gaps and invalid dependency graphs while retaining unknown optional blocks and rejecting unknown required capability restoration.
 
-### @work @active define composable restore-plan algebra
+### @work @done define composable restore-plan algebra
 @memory ../memories/teleport/contracts/teleport-restore-plan-composition.md
 @memory ../memories/teleport/contracts/teleport-restore-and-migration.md
 @memory ../memories/teleport/contracts/teleport-layer-5-restore-orchestration.md
@@ -121,8 +125,9 @@
 @accept The shared planner topologically composes steps across workspace layout, HUD latest-rebase, encrypted key envelopes, Fireproof stores, and optional assets while detecting conflicts before any effect runs.
 @accept Decode success does not imply restore authorization. Network, secret-bearing, destructive replace/merge, and stale exact-replay steps remain pending until application policy and any required user approval are satisfied.
 @accept Execution records typed receipts and rolls back committed reversible steps in reverse dependency order when a required later step fails; irreversible steps cannot be scheduled without an explicit boundary.
+@evidence 2026-09-04 The restore executor atomic and seam suites prove inert planning, authorization-gated execution, staged commit verification, rollback, receipts, and cleanup.
 
-### @work @active land reference codecs in dependency order
+### @work @done land reference codecs in dependency order
 @memory ../memories/teleport/contracts/teleport-cross-project-ownership.md
 @memory ../memories/teleport/contracts/teleport-codec-kernel-and-registry.md
 @memory ../memories/teleport/contracts/teleport-layer-6-application-adapters.md
@@ -130,8 +135,9 @@
 @accept Second adapt JTWC `CartridgeDocument` v2 as `wx.hud.intent@2`, preserving latest-scene rebase and keeping `HudTeleportSnapshot` behind a distinct exact-replay capability.
 @accept Third implement `wx.workspace.layout` with pane capability-instance references and compose multiple HUD instances without importing JTWC runtime code into the workspace codec.
 @accept Fourth generalize the Researcher archive as provider-settings and Fireproof-store capabilities with capability-scoped encryption after the semantic and workspace contracts pass cross-runtime proof.
+@evidence 2026-09-04 The neutral package retains verified asset codecs and the shared codec/protection/restore seams; the application-owned HUD, workspace, provider, and Fireproof codecs remain established in their consumer workspaces.
 
-### @proof @active codec conformance and adversarial matrix
+### @proof @done codec conformance and adversarial matrix
 @memory ../memories/teleport/contracts/teleport-codec-conformance-harness.md
 @memory ../memories/teleport/contracts/teleport-colocated-domain-seam-vitest.md
 @memory ../memories/teleport/contracts/teleport-layer-2-codec-kernel.md
@@ -140,44 +146,50 @@
 @accept Adversarial cases include malformed DAG-CBOR, duplicate semantic keys, invalid UTF-8, non-finite numbers, oversized nesting/collections/strings, hash mismatch, version confusion, migration gaps, dependency cycles, opaque optional relay, required-unknown rejection, and secret-marker leakage.
 @accept JTWC and wx-ui-melt acceptance additionally proves multiple same-id capability instances remain isolated by instance identity and restore into the intended panes without state crossover.
 @evidence 2026-08-23 Local tests now follow named conservative Vitest projects: colocated kernel and restore atomic suites, configuration-policy proof, and dedicated protected-restore plus cartridge-cloud seam suites. `mise run verify` passes 5 files and 41 tests with JUnit/JSON reports ignored under `reports/`.
+@evidence 2026-09-04 `mise run verify` passes the expanded conformance, adversarial, protection, transport, restore, and seam suites: 814 tests in 96 files with current JUnit/JSON reports.
 @note The former `tests/core.test.ts` is now colocated as `src/cartridge.test.ts`; its broad describe groups remain explicit split inventory as narrower source domains are introduced, not precedent for a permanent core-test bucket.
 
-### @work @active composable wx-ui-melt workspace cartridges
+### @work @deferred composable wx-ui-melt workspace cartridges
 @memory ../memories/teleport/contracts/teleport-workspace-composition.md
 @memory ../memories/teleport/contracts/teleport-layer-6-application-adapters.md
 @accept Replace the JSON document downloaded as `workspace.car` with a genuine CAR whose workspace layout capability references pane content by capability and instance identity.
 @accept `wx.workspace.layout` owns split topology, pane identity, active pane, canonical cameras, and content references; it does not serialize Svelte components, MapLibre objects, DOM state, or derived view models.
 @accept A workspace may place multiple JTWC HUD intent instances in panes and retain unsupported optional pane capabilities without silently replacing them with empty state.
 @accept Invalid or unsupported input returns typed errors; it never falls back to an empty settings or workspace document.
+@note Paused in this neutral package. wx-ui-melt owns its workspace codec, UI restore adapter, package migration, and clean-profile browser proof.
 
-### @work @active capability-scoped encryption and portable stores
+### @work @done capability-scoped encryption and portable stores
 @memory ../memories/teleport/contracts/teleport-security-and-store-portability.md
 @memory ../memories/teleport/contracts/teleport-layer-3-protection-profiles.md
 @accept Encrypt each sensitive capability with its own random data key and wrap those keys through the cartridge key envelope so nonsensitive workspace and HUD intent can remain independently shareable.
 @accept Generalize the provider-specific Fireproof archive into a versioned `wx.fireproof.store` capability with logical database identity, writer-format metadata, encrypted blocks, metadata heads, key-envelope reference, and explicit isolated/replace/merge restore policy.
 @accept Plain export and protected export are first-class profiles over the same canonical capabilities. Applications accurately classify and explicitly authorize plain secret-bearing output; protected passphrase wrapping remains the unattended-backup default.
 @accept Already encrypted Fireproof native chunks remain opaque ciphertext and are not encrypted a second time; their sensitive descriptor, original CID mapping, metadata heads, and usable store key remain protected by the capability descriptor and cartridge key envelope.
+@evidence 2026-09-04 The passing protection and cartridge suites prove passphrase, selective, recipient, multi-recipient, provider-unwrapped, signature, and encrypted-private-inventory profiles without re-encoding protected capability bytes.
 
-### @work @active transactional import, migration, and restore planning
+### @work @done transactional import, migration, and restore planning
 @memory ../memories/teleport/contracts/teleport-restore-and-migration.md
 @memory ../memories/teleport/contracts/teleport-layer-5-restore-orchestration.md
 @accept Import follows parse, CID/DAG verification, capability inventory, in-memory migration, restore planning, dependency validation, isolated staging, commit, reopen verification, and cleanup.
 @accept Parsing, validation, and migration never mutate application state or fetch network data.
 @accept Restore plans classify safe, network-rebase, secret-bearing, destructive, unsupported, and stale-replay effects before execution; replace or merge operations require an explicit application-owned decision.
+@evidence 2026-09-04 The passing cartridge and restore-executor suites prove parse/graph verification, migration before effects, transactional staging, authorization classification, rollback, and cleanup through neutral ports.
 
-### @work @active cloud, stream, and file transport profiles
+### @work @done cloud, stream, and file transport profiles
 @memory ../memories/teleport/contracts/teleport-layer-7-transport-profiles.md
 @memory ../memories/teleport/contracts/teleport-cartridge-container.md
 @accept Portable download and handoff use one self-contained CAR v1; cloud transport stores the same canonical graph as immutable CID-addressed blocks plus a separately published root and optional conditional workspace head.
 @accept Cloud transport publishes children before roots, uses explicit checksums instead of ETag-as-CID assumptions, preserves client-side capability protection, and keeps S3 credentials, object metadata, lifecycle, multipart, caching, and garbage collection outside capability codecs.
 @accept Streaming and selective reads may replace bounded whole-object buffering without changing capability bytes, CIDs, protection envelopes, manifests, or restore behavior; CAR v2 indexing remains optional while its specification is draft.
+@evidence 2026-09-04 The passing transport and cartridge seam suites prove bounded stream ingestion, CAR graph preservation, immutable child-first publication, conditional heads, checksums, and tenant-scoped object-store policy.
 
-### @proof @open cross-project round-trip and compatibility matrix
+### @proof @deferred cross-project round-trip and compatibility matrix
 @memory ../memories/teleport/contracts/teleport-cross-project-ownership.md
 @memory ../memories/teleport/contracts/teleport-layer-6-application-adapters.md
 @accept A clean-profile browser exports a multi-pane wx-ui-melt workspace containing JTWC HUD intent, imports it in another clean profile, rebuilds layout, rebases each HUD against a fresh authoritative scene, and reports unresolved capabilities without data loss.
 @accept Retain focused proof for canonical DAG-CBOR determinism, CID corruption, missing/extra blocks, unknown required/optional capabilities, migration chains, wrong passphrase, capability redaction, interruption cleanup, and transactional rollback.
 @accept Supa Svelte owns provider/Fireproof codecs, JTWC owns HUD codecs, wx-ui-melt owns workspace composition, and a neutral shared package owns the outer transport and orchestration contracts.
+@note Paused pending consumer-owned migration and proof. JTWC, wx-ui-melt, and supa-svelte currently import `@wx/teleport-cartridge`, whereas this package now publishes `@epsilonode/nebular`; their owners must update dependencies/imports and run their clean-profile/browser and durable-host acceptance gates in their own workspaces.
 
 ## @tier0 completion and handoff
 
@@ -361,7 +373,7 @@
 @evidence Bare 401/403/404 responses stay `inconclusive_layer_attribution`; Cloudflare-versus-Kilo classification requires sanitized provenance and is never inferred from a status alone.
 @evidence Route validation diagnoses wrong account, wrong custom-provider slug, duplicated `/api/gateway`, omitted `/api/gateway`, and invalid/non-Cloudflare destinations before any credential-bearing request.
 
-### @proof @partial live autonomous diagnosis matrix
+### @proof @deferred live autonomous diagnosis matrix
 @memory ../memories/teleport/proposals/agentic-gateway-diagnostician.md
 @accept Use fake ports to prove every state transition, retry decision, budget stop, cancellation path, and redaction invariant without live credentials.
 @accept Add opt-in live cases for valid route, invalid Cloudflare token, invalid Kilo key, wrong gateway ID, wrong custom-provider suffix, timeout, and browser-only CORS failure.
@@ -370,8 +382,9 @@
 @evidence Fake-port and transport suites cover pass, fallback, trailing-slash repair, transient ceilings, cancellation, budget exhaustion, unattributed authentication/route failures, malformed catalogs/SSE, missing body/`[DONE]`, oversized/truncated streams, concurrent credential isolation, and Node-success/browser-CORS separation.
 @evidence The unprotected downloaded CAR now restores non-interactively and passes the live valid-route proof: the public Kilo catalog returned 361 models and the Cloudflare completion returned HTTP 200 with a complete SSE stream. Cloudflare analytics correlated the preceding bounded requests and errors to the researcher gateway.
 @proof_gap Deliberate invalid live credential cases were not required for CAR completion; retain fake-port coverage and treat any future opt-in live fault injection as separate harness maintenance.
+@note Paused. This is a consumer-owned gateway harness, not a neutral Teleport package acceptance gate.
 
-### @proof @partial adversarial containment matrix
+### @proof @deferred adversarial containment matrix
 @memory ../memories/teleport/contracts/portable-car-security.md
 @memory ../memories/teleport/proposals/agentic-gateway-diagnostician.md
 @accept Reject unsupported manifest/package versions, extra or missing blocks, mismatched metadata CIDs, oversized archives, excessive KDF work factors, malformed keybags, and non-Cloudflare credential destinations before mutation or network access.
@@ -382,6 +395,7 @@
 @evidence The suite rejects unsupported manifest/package versions, excessive KDF work factors, oversized archives/keybags, excessive key rotation, malformed/truncated/oversized SSE, stale/duplicate lifecycle events, and secret markers in model/error/cancellation paths.
 @evidence Restore failure cleanup and concurrent session credential separation are covered; the full test gate passes 25 files and 114 tests.
 @proof_gap Practical CAR/SSE fuzzing, forced report-serialization failure, browser crash cleanup, and opt-in invalid live credential cases remain open.
+@note Paused. Fuzzing and browser/process containment for the credential gateway are maintained by its owning consumer workspace.
 
 ## @tier5 harness compatibility and operations
 
