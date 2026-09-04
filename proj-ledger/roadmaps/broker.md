@@ -234,6 +234,7 @@
 @evidence 2026-09-04 Generated request-expiry reducer laws now prove deterministic reduction and terminal non-replayability across bounded issued-at/duration inputs; `mise exec -- bun run check:broker` passes 605 tests in 59 files.
 @evidence 2026-09-04 Generated grant-persistence reducer laws now prove deterministic pending-to-active reduction across bounded valid persistence times and reject replay against the active successor; `mise exec -- bun run check:broker` passes 606 tests in 59 files.
 @evidence 2026-09-04 Generated encrypted-transfer admission laws now prove fresh-plan determinism across bounded scope subsets and valid times while a consumed replay is rejected before any commit plan; `mise exec -- bun run check:broker` passes 607 tests in 59 files.
+@evidence 2026-09-04 Generated Result-faÃ§ade laws now prove left identity, associative dependent composition, and typed nonempty conversion of thrown mechanics at the broker boundary; `mise exec -- bun run check:broker` passes 609 tests in 60 files.
 @proof_gap Broader durable replay and remaining grant-lifecycle reducer laws remain open. A second materially different real provider is still required before claiming the provider abstraction universal. Optics remain deliberately unadopted because no measured pressure justifies them.
 
 ### @work @partial define closed broker contracts and threat model
@@ -354,6 +355,7 @@
 @memory ../memories/teleport/broker/broker-request-grant-transfer-state-machines.md
 @memory ../memories/teleport/broker/broker-capability-specific-ports.md
 @blocker Core broker, consent, and client conformance must pass without provider-specific assumptions.
+@blocker No concrete provider or existing Mise deployment workflow is named for this cartridge. A product owner must select the first provider, required scopes, authentication flow, renewal authority, and target workflow before an adapter can be implemented or evaluated.
 @accept Provider adapters describe supported scopes, upstream expiry, refresh/token-exchange behavior, revocation, and redacted identity metadata behind a closed port.
 @accept Start with one provider required by an existing Mise deployment workflow, then prove a second provider with materially different authentication semantics before generalizing the adapter contract.
 @accept Prefer upstream OAuth, device authorization, service-token exchange, or restricted short-lived tokens over storing broad static API keys.
@@ -406,6 +408,7 @@
 
 ### @proof @open cross-workspace developer workflow
 @memory ../memories/teleport/broker/broker-associated-workspace-hard-migration.md
+@blocker 2026-09-04 Current consumers `jtwc`, `wx-ui-melt`, and `supa-svelte` still declare and import the retired `@wx/teleport-cartridge` package rather than this package's published `@epsilonode/nebular` identity. Their owners must atomically migrate manifests, imports, and lockfiles before the multi-workspace workflow can be run without source/link fallback.
 @accept Prove at least two Mise-managed workspaces can request different least-privilege credentials without sharing grants or storing project secrets.
 @accept Prove an agent can request authorization, the user can enter or approve a credential entirely outside chat, and the authorized Mise task completes without the raw key appearing in the conversation or repository.
 @accept Document installation, broker startup, trusted prompt identity, grant inspection, revocation, provider recovery, and removal in lightweight tiered-routing guidance.
@@ -445,12 +448,13 @@
 @memory ../memories/teleport/broker/broker-property-and-type-proof-strategy.md
 @memory ../memories/teleport/broker/broker-algebra-ownership-lint-contract.md
 @memory ../memories/teleport/broker/broker-domain-algebra-implementation-sequence.md
-@evidence 2026-09-04 A clean `mise run verify` passes zero warnings, all five domain/artifact compiler projects plus compile-negative policy, 101 deterministic test files/828 tests, eight deliberate lint failures, 24 exact production exception surfaces, test inventory classification, package declarations, artifact checks, and isolated installed-tarball resolution. The broker-only Effect suite proves Result conversion, finalization on success/typed failure/interruption, defect separation, cancellation projection, and redaction. Bounded fast-check laws cover authority and provider-indexed scope algebra; compile-negative fixtures prove illegal trust/authority/provider/exposure edges cannot typecheck.
+@evidence 2026-09-04 A clean `mise run verify` passes zero warnings, all five domain/artifact compiler projects plus compile-negative policy, 102 deterministic test files/830 tests, eight deliberate lint failures, 24 exact production exception surfaces, test inventory classification, package declarations, artifact checks, and isolated installed-tarball resolution. The broker-only Effect suite proves Result conversion, finalization on success/typed failure/interruption, defect separation, cancellation projection, and redaction. Bounded fast-check laws cover authority and provider-indexed scope algebra; compile-negative fixtures prove illegal trust/authority/provider/exposure edges cannot typecheck.
 @evidence 2026-09-04 Bounded fast-check canonical-codec laws now prove source-object insertion-order independence and decode-to-reencode byte/CID idempotence for generated valid values; `mise exec -- bun run check:teleport` passes 60 tests in 7 files.
 @evidence 2026-09-04 Bounded fast-check authority-request expiry laws now prove deterministic reduction and terminal non-replayability; `mise exec -- bun run check:broker` passes 605 tests in 59 files.
 @evidence 2026-09-04 Bounded fast-check grant-persistence laws now prove deterministic pending-to-active reduction and successor replay rejection; `mise exec -- bun run check:broker` passes 606 tests in 59 files.
 @evidence 2026-09-04 Bounded fast-check encrypted-transfer admission laws now prove fresh-plan determinism and consumed-replay rejection before commit planning; `mise exec -- bun run check:broker` passes 607 tests in 59 files.
-@proof_gap Broader warning/Result/durable-replay and grant-lifecycle reducer laws plus bounded performance/streaming measurements remain before closing the full FP proof target. Production adapter admission must keep the 22-surface inventory exact or reduce it; any exception drift fails verification.
+@evidence 2026-09-04 Bounded fast-check Result-faÃ§ade laws now prove left identity, associative dependent composition, and typed thrown-mechanic conversion; `mise exec -- bun run check:broker` passes 609 tests in 60 files.
+@proof_gap Broader warning/durable-replay and grant-lifecycle reducer laws plus bounded performance/streaming measurements remain before closing the full FP proof target. Production adapter admission must keep the 22-surface inventory exact or reduce it; any exception drift fails verification.
 @accept Prove type-aware lint actually executes every configured rule, emits zero warnings, and rejects negative fixtures for mutation, ambient effects, promise misuse, nonexhaustive state, expected-failure throws, and forbidden import direction.
 @accept Prove all compiler projects independently pass with their minimal ambient types and isolated consumer fixtures resolve all public declarations without source aliases or privileged leakage.
 @accept Prove named atomic projects, cross-domain seam projects, and opt-in live projects select each test exactly once and preserve conservative deterministic execution.
