@@ -3,13 +3,13 @@
 @roadmap broker
 @updated 2026-09-05
 @meta name=roadmap-format content="../format-guidance.md"
-@meta name=roadmap-status content="deferred"
+@meta name=roadmap-status content="paused"
 @meta name=owner-project content="R:/Code/web/wx-teleport-cartridge"
 @meta name=implementation-boundary content="independent packages and privileged broker process"
 @meta name=related-roadmap content="car-teleport.md"
 @meta name=required-runtime content="Bun through Mise"
 @meta name=planned-public-upstream content="https://github.com/epsilonode/nebular"
-@note This roadmap defines an optional local-development credential broker within wx-teleport-cartridge. Browser Teleport import/export is the primary product and is governed by `car-teleport.md`; this Bun-only broker is not a browser runtime dependency or a prerequisite for browser package release, consumer migration, or CAR transfer between browser profiles.
+@note Paused pending the delegated Bake receiver/Windows-containment work. This roadmap retains the separately shippable Bun `broker-client`, `recipe-runner`, and `broker` artifacts for Bake and related Bun consumers. Browser Teleport import/export is the primary product and is governed by `car-teleport.md`; Bun artifacts are never browser runtime dependencies or prerequisites for browser package release, consumer migration, or CAR transfer between browser profiles.
 
 ## @tier9 active architecture and security boundary
 

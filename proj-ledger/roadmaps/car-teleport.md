@@ -4,7 +4,7 @@
 @updated 2026-09-05
 @meta name=roadmap-format content="../format-guidance.md"
 @meta name=memory-format content="../making-memories.md"
-@meta name=roadmap-status content="deferred"
+@meta name=roadmap-status content="active"
 @meta name=memory-root content="../memories/teleport/"
 @meta name=owner-project content="R:/Code/web/wx-teleport-cartridge"
 @meta name=consumer-projects content="R:/Code/web/jtwc; R:/Code/web/wx-ui-melt; R:/Code/web/supa-mail-hook/supa-svelte"
@@ -190,9 +190,9 @@
 @memory ../memories/teleport/contracts/teleport-layer-6-application-adapters.md
 @memory ../memories/teleport/contracts/portable-car-security.md
 @decision @accepted The browser is the ultimate Teleport Cartridge consumer. The existing portable root `teleport.ts`/`teleport.js` is the sole browser-facing package surface; Bun is build tooling only and the optional broker, recipe runner, keychain, PM2, and process features are neither loaded nor required for browser import/export.
-@accept The browser release package exposes the portable root only. Before publication, remove or defer nonportable package exports rather than distribute Bun-oriented entrypoints beside the browser artifact; optional broker experiments remain source-only/deferred and cannot impose runtime, build, verification, or release dependencies on browser consumers.
+@accept Browser consumers use the portable root only. The package may independently ship the four Bun artifacts for Bake and other Bun consumers, but their exports, runtime constraints, and release gates remain separate and cannot impose runtime, build, verification, or release dependencies on browser consumers.
 @blocker The browser-ready package is not published: on 2026-09-05 `https://esm.sh/@epsilonode/nebular@0.1.0` returned HTTP 404. Consumers therefore still resolve linked workspace source instead of one immutable compiled portable artifact.
-@blocker The current manifest/build still declares four entrypoints and includes source plus Bun artifacts in the package inventory. Reduce the published browser package to the portable runtime/declaration/metadata set and replace the four-artifact verification with a portable-only package/CDN gate before release.
+@blocker The current manifest/build includes source entrypoints in the package inventory. Publish only compiled `dist` artifacts and declarations plus ordinary package metadata; retain the independently shippable Bun artifacts, but add a portable-root-only package/CDN gate before browser release rather than treating the four-artifact gate as a browser prerequisite.
 @accept Each application browser profile owns its NanoStore and Fireproof documents as the source of truth. Its adapter projects selected state to its capability codecs, calls the neutral export/import and restore-plan interfaces, and owns all framework/store mutation, file-picker/download, confirmation, and visible progress UI.
 @accept The generic browser flow is deliberately small: choose export -> assemble/optionally protect/download a CAR; choose import -> parse/verify/unlock -> inspect the restore plan -> application-confirmed execute/rollback. No Bun/Node API, broker bridge, browser-local privileged service, secret delivery, recipe execution, or application-store import may enter the portable graph.
 @accept Browser applications externalize the bare portable `@epsilonode/nebular` import and resolve it through one pinned published-package CDN import-map URL. They may install that exact version only for declarations/type checking; they never use `link:`, `file:`, GitHub TypeScript source URLs, workspace paths, or an application-bundled copy in production output.

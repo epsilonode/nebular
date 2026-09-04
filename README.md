@@ -13,8 +13,9 @@ TypeScript source:
 
 Configure the browser bundler to leave the bare package specifier external, and use the same immutable
 published package only for declaration/type resolution. GitHub/esm.sh TypeScript URLs are development
-and source-inspection paths; they are not production browser dependencies. Bun is build tooling only:
-the published browser package contains no Bun runtime entrypoints or dependencies.
+and source-inspection paths; they are not production browser dependencies. The package may also ship
+separately constrained Bun artifacts for Bake and other Bun consumers, but browser applications never
+load or depend on them.
 
 ## `teleport.ts`
 
@@ -41,7 +42,8 @@ implementation order, blockers, and proof are maintained only in:
 
 - [`proj-ledger/roadmaps/car-teleport.md`](proj-ledger/roadmaps/car-teleport.md)
 
-The retained broker roadmap is deferred source-level work and is not part of the browser package.
+The retained broker roadmap is paused pending Bake work. Its Bun artifacts remain separately shippable
+but are not part of the browser runtime.
 
 ## Development
 
