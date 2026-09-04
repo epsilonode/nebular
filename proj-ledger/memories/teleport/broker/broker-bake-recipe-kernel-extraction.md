@@ -3,12 +3,13 @@ id: broker-bake-recipe-kernel-extraction
 kind: strategy
 status: proposed
 created: 2026-08-23
-updated: 2026-08-23
+updated: 2026-09-05
 roadmap: broker
 refs:
   - roadmaps/broker.md#adopt-and-harden-pk-ipc-and-lifecycle-semantics
   - roadmaps/broker.md#extract-and-localize-the-bake-recipe-kernel
   - memories/teleport/broker/broker-pk-recipe-runner-adoption.md
+  - R:/Code/pk/proj-ledger/roadmaps/recipes.md#universal-pm2-receiver-and-reusable-one-shot-slots
   - memories/teleport/broker/broker-process-receiver-algebra.md
   - memories/teleport/broker/broker-agent-objective-observability.md
 hook: "read before continuing recipe work in Bake, extracting @bake/recipe, copying recipe source or fixtures, deciding which Bake behavior is admitted, or adding a Bake dependency"
@@ -48,6 +49,14 @@ hook: "read before continuing recipe work in Bake, extracting @bake/recipe, copy
 @local A change begins directly in wx-teleport-cartridge when it concerns credential requirements, Git-scoped broker authority, grants, consent, OS keychain access, secret leases, encrypted CAR transfer, broker IPC, receiver secret delivery, or strict package/authority boundaries unique to this project.
 @dual Avoid implementing the same unfinished feature concurrently in both workspaces. Complete and prove the generic Bake behavior, freeze its fixture, transplant once, and then apply local adaptations. If a local need changes the generic contract before cutover, update the admission matrix rather than silently editing both copies.
 @bugs A generic defect discovered after transplant may be fixed in either owner first, but exchange the minimal failing fixture and semantic patch deliberately. Never restore a hidden runtime dependency or automatic source synchronization merely to reduce duplicate maintenance.
+
+## Cross-workspace admission handshake
+
+@protocol Treat Bake and Nebular as two explicit owners with one source-and-proof handoff, never as parallel implementations. Before either workspace begins a generic recipe, PM2 receiver, or Windows-containment change that may cross the boundary, inspect the linked Bake `recipes` roadmap section and this card. The current Bake baseline is immutable revision `7964fc9434a76b23c9d04f075b1a97f504a21805`; a later handoff must name its own revision rather than relying on a branch name.
+@bake_packet Bake supplies an immutable revision; exact source paths and public symbols; dependency-closure summary; focused test/fixture paths and commands with outcomes; declared semantic contract; known gaps; and a redacted runtime-proof receipt when the behavior is effectful. For native Windows containment this packet includes creator-versus-observer Job access/session/query/handle-lifetime facts, not raw handles, PIDs, commands, PM2 payloads, or secrets.
+@nebular_receipt Nebular records one disposition for every supplied candidate: `admit`, `adapt`, `reimplement`, `exclude`, or `defer`. The receipt names the local target, branded/authority adaptations, parity fixture, verification gate, and the reason any Bake behavior is rejected. No local implementation begins from an assumed Bake feature, roadmap claim, or remembered API; no code is copied until this receipt exists in the admission matrix.
+@sync When Bake changes an admitted candidate, it sends the minimal semantic diff plus its failing/passing fixture; Nebular decides whether the local contract changes, needs an adaptation, or intentionally diverges. When Nebular discovers a generic receiver defect, it returns the smallest redacted reproducer to Bake before making an equivalent local change. Each owner remains independently buildable, testable, and releasable throughout.
+@forbid Do not use a Git branch, workspace link, filesystem import, generated bundle, copied `dist`, or a shared lockfile as synchronization. Do not port a `taskkill` timeout fallback as a containment claim. Human/roadmap handoff plus immutable revision, source, fixture, and proof provenance is the integration mechanism.
 
 ## Transplant mechanics
 
