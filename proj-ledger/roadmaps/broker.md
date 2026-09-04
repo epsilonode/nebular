@@ -354,13 +354,14 @@
 @accept Prefer upstream OAuth, device authorization, service-token exchange, or restricted short-lived tokens over storing broad static API keys.
 @accept Renewal always repeats policy evaluation and user verification when required; scope expansion always requires a new explicit consent.
 
-### @work @ready integrate optional Teleport credential requirements
+### @work @done integrate optional Teleport credential requirements
 @memory ../memories/teleport/broker/broker-codec-adt-and-registry-boundary.md
 @blocker Broker contracts and neutral credential-requirement schema must be stable.
 @accept Define a nonsecret `dev.credential.requirement` capability containing provider, environment, scopes/operations, project-binding policy, injection name, and optional account constraints.
 @accept Cartridge decode and restore planning report unresolved credential requirements without fetching, unlocking, embedding, or silently provisioning secrets.
 @accept Importing a cartridge may start a broker consent flow but cannot bypass local policy, user verification, project binding, expiry, or provider authentication.
 @accept Keep recipient-encrypted `secret-transfer` separate, opt-in, short-lived, replay-aware, and interactively imported. It is not required for ordinary local development.
+@evidence 2026-09-04 `dev.credential.requirement@1` is a bounded canonical DAG-CBOR public capability with strict provider/environment/scope/operation, project-binding, injection-name, and optional account-constraint decoding. Its conformance and CAR composition tests prove it only projects a retained unresolved requirement; no keychain, provider, consent, or secret action occurs during decode or restore planning. `mise exec -- bun run check:broker` passes 598 tests.
 
 ### @work @partial implement encrypted credential CAR export and import
 @memory ../memories/teleport/broker/broker-codec-adt-and-registry-boundary.md

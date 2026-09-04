@@ -10,6 +10,7 @@ export * from './bun-secret-store.ts';
 export * from './bun-windows-profile.ts';
 export * from './bun-windows-filesystem-facts.ts';
 export * from './control-handler.ts';
+export * from './credential-requirement.ts';
 export * from './current-recipe.ts';
 export * from './git-current-recipe.ts';
 export * from './grant-qualified-one-shot-start.ts';
