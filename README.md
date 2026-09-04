@@ -4,18 +4,18 @@ Nebular is a portable TypeScript toolkit for moving application capabilities, re
 and supplying narrowly authorized development credentials without putting secrets in repositories or
 agent conversations.
 
-The public source lives at `epsilonode/nebular`. Once released, each version exposes four stable
-TypeScript entrypoints that can be consumed from GitHub through esm.sh:
+The public source lives at `epsilonode/nebular`. Browser applications consume the compiled portable
+package export through a pinned CDN import map; they do not link this workspace or compile its
+TypeScript source:
 
 ```text
-https://esm.sh/gh/epsilonode/nebular@<tag-or-commit>/teleport.ts
-https://esm.sh/gh/epsilonode/nebular@<tag-or-commit>/broker-client.ts
-https://esm.sh/gh/epsilonode/nebular@<tag-or-commit>/recipe-runner.ts
-https://esm.sh/gh/epsilonode/nebular@<tag-or-commit>/broker.ts
+@epsilonode/nebular -> https://esm.sh/@epsilonode/nebular@<published-version>
 ```
 
-Use an immutable release tag or commit. Do not use a floating branch for production, credential, or
-authority-bearing workflows.
+Configure the browser bundler to leave the bare package specifier external, and use the same immutable
+published package only for declaration/type resolution. GitHub/esm.sh TypeScript URLs are development
+and source-inspection paths; they are not production browser dependencies. The Bun-only entrypoints
+remain package artifacts for installed, Mise-managed consumers and are never loaded from a browser CDN.
 
 ## `teleport.ts`
 
