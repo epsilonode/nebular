@@ -5,12 +5,19 @@ import {
   type BrokerClientResult,
   type BrokerRequestMessage
 } from '../broker-client/public.ts';
-import type { AdmittedRecipe } from './model.ts';
-import type { RecipeRelativePath, RecipeRevision } from './primitives.ts';
-import { recipeErr, recipeOk, type RecipeRunnerIssues, type RecipeRunnerResult } from './result.ts';
+import {
+  recipeErr,
+  recipeOk,
+  type AdmittedRecipe,
+  type RecipeRelativePath,
+  type RecipeRevision,
+  type RecipeRunnerIssues,
+  type RecipeRunnerResult
+} from '../recipe-contract/public.ts';
 
 export type ExecuteRecipeRequestInput = Readonly<{
   recipe: AdmittedRecipe;
+  grantIdHint: string;
   repositoryPathHint: string;
   recipePathHint: RecipeRelativePath;
   recipeRevision: RecipeRevision;
@@ -48,6 +55,7 @@ export const buildExecuteRecipeRequest = (
     sentAtMs: input.sentAtMs,
     payload: {
       operation: 'execute-recipe',
+      grantIdHint: input.grantIdHint,
       repositoryPathHint: input.repositoryPathHint,
       recipePathHint: input.recipePathHint.value,
       recipeRevision: input.recipeRevision.value,

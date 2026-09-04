@@ -102,7 +102,6 @@ const exceptionSurfaces: readonly ExceptionSurface[] = [
   { file: 'src/broker-client/ipc.ts', rules: ['functional/prefer-immutable-types', 'functional/type-declaration-immutability'] },
   { file: 'src/broker/primitives.ts', rules: ['@typescript-eslint/no-unsafe-type-assertion'] },
   { file: 'src/broker/result.ts', rules: ['functional/prefer-immutable-types', 'functional/type-declaration-immutability'] },
-  { file: 'src/broker/authority.ts', rules: ['functional/prefer-immutable-types'] },
   { file: 'src/broker/bootstrap-authority.ts', rules: ['functional/prefer-immutable-types'] },
   {
     file: 'src/broker/bun-bootstrap-inherited-ipc.ts',
@@ -110,13 +109,37 @@ const exceptionSurfaces: readonly ExceptionSurface[] = [
   },
   {
     file: 'src/broker/bun-inherited-ipc.ts',
-    rules: ['functional/immutable-data', 'functional/no-let', 'functional/prefer-immutable-types']
+    rules: ['functional/immutable-data', 'functional/no-let']
   },
   { file: 'src/broker/bun-secret-store.ts', rules: ['functional/prefer-immutable-types'] },
   { file: 'src/broker/bun-sqlite-journal.ts', rules: ['functional/prefer-immutable-types'] },
+  {
+    file: 'src/broker/pm2-monitor-projection.ts',
+    rules: [
+      'functional/immutable-data',
+      'functional/no-let',
+      'functional/no-loop-statements',
+      'functional/prefer-immutable-types'
+    ]
+  },
+  {
+    file: 'src/broker/pm2-application-rpc.ts',
+    rules: [
+      'functional/immutable-data',
+      'functional/prefer-immutable-types',
+      'functional/type-declaration-immutability'
+    ]
+  },
+  {
+    file: 'src/broker/bun-windows-filesystem-facts.ts',
+    rules: ['functional/prefer-immutable-types']
+  },
+  {
+    file: 'src/broker/windows-named-mutex-allocation.ts',
+    rules: ['functional/immutable-data', 'functional/prefer-immutable-types']
+  },
   { file: 'src/broker/effect-runtime.ts', rules: ['functional/prefer-immutable-types'] },
   { file: 'src/broker/lease.ts', rules: ['functional/prefer-immutable-types', 'functional/type-declaration-immutability'] },
-  { file: 'src/broker/operation.ts', rules: ['functional/prefer-immutable-types'] },
   { file: 'src/broker/provider-contract.ts', rules: ['functional/prefer-immutable-types'] },
   { file: 'src/broker/receiver.ts', rules: ['functional/prefer-immutable-types'] },
   { file: 'src/broker/secret-delivery.ts', rules: ['functional/prefer-immutable-types'] },

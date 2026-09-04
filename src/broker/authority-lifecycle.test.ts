@@ -24,6 +24,7 @@ import {
   type ApprovedAuthorityRequest,
   type AuthorityGrantProposal,
   type AuthorityGrantTransition,
+  type AuthorityCredentialBindingSet,
   type AuthorityInstant,
   type AuthorityLifecycleResult,
   type AuthorityRequest,
@@ -97,16 +98,19 @@ const proposal = (
   overrides: Partial<AuthorityGrantProposal> = {}
 ): AuthorityGrantProposal => {
   const firstSlot = unwrapBroker(parseCredentialSlotId('weather-api'));
+  const credentialBindings: AuthorityCredentialBindingSet = [{
+    credentialReference: unwrapBroker(parseCredentialReference('weather-primary')),
+    credentialSlotIds: createCredentialSlotSet(firstSlot),
+    providerAuthority: providerAuthority()
+  }];
   return {
     grantId: unwrapBroker(parseGrantId('grant-1')),
     repository: unwrapBroker(parseCanonicalRepository('R:\\Code\\weather-app')),
     recipeRevision: unwrapBroker(parseRecipeRevision('sha256:recipe-v1')),
     recipeDisplayPath: unwrapLifecycle(parseRecipeDisplayPath('.pk/recipes/weather.xml')),
     requestingExecutable: unwrapLifecycle(parseRequestingExecutable('mise run weather')),
-    credentialReference: unwrapBroker(parseCredentialReference('weather-primary')),
-    credentialSlotIds: createCredentialSlotSet(firstSlot),
+    credentialBindings,
     authorityDigest: unwrapJournal(parseRedactedAuthorityDigest('sha256:redacted-weather-authority')),
-    providerAuthority: providerAuthority(),
     promptVersion: unwrapLifecycle(parseConsentPromptVersion('nebular-consent/v1')),
     consentPurpose: 'credential-enrollment',
     requestedGrantExpiresAt: instant(10_000),
@@ -142,13 +146,12 @@ const parsedRequest = (
 
 const policyAcceptedRequest = (
   requestProposal: AuthorityGrantProposal = proposal(),
-  effectiveAuthority: ProviderAuthority = requestProposal.providerAuthority,
+  effectiveBindings: AuthorityCredentialBindingSet = requestProposal.credentialBindings,
   expiresAt: AuthorityInstant = instant(9_000)
 ): PolicyAcceptedAuthorityRequest => stateOf(unwrapLifecycle(reduceAuthorityRequest(parsedRequest(requestProposal), {
   type: 'policy-accepted',
   at: instant(300),
-  providerAuthority: effectiveAuthority,
-  credentialSlotIds: requestProposal.credentialSlotIds,
+  credentialBindings: effectiveBindings,
   grantExpiresAt: expiresAt
 })), 'policy-accepted');
 
@@ -228,11 +231,10 @@ describe('authority request, consent, grant, revocation, and expiry algebras', (
           repository: accepted.proposal.repository,
           recipeDisplayPath: accepted.proposal.recipeDisplayPath,
           requestingExecutable: accepted.proposal.requestingExecutable,
-          credentialSlotIds: accepted.policy.credentialSlotIds
+          credentialBindings: accepted.policy.credentialBindings
         })
       })
     ]);
-    expect(JSON.stringify(consent.effects)).not.toContain('weather-primary');
     expect(JSON.stringify(consent.effects)).not.toContain('secret');
 
     const approved = unwrapLifecycle(reduceAuthorityRequest(awaiting, {
@@ -271,16 +273,23 @@ describe('authority request, consent, grant, revocation, and expiry algebras', (
     }));
   });
 
-  it('allows policy narrowing while rejecting scope, operation, or slot widening', () => {
+  it('allows provider-authority narrowing while rejecting operation widening or slot drift', () => {
+    const baseProposal = proposal();
+    const baseBinding = baseProposal.credentialBindings[0];
     const broaderProposal = proposal({
-      providerAuthority: providerAuthority(['forecast', 'history'], ['alerts:read', 'stations:read'])
+      credentialBindings: [{
+        ...baseBinding,
+        providerAuthority: providerAuthority(['forecast', 'history'], ['alerts:read', 'stations:read'])
+      }]
     });
     const narrowedAuthority = providerAuthority(['forecast'], ['alerts:read']);
     const narrowed = unwrapLifecycle(reduceAuthorityRequest(parsedRequest(broaderProposal), {
       type: 'policy-accepted',
       at: instant(300),
-      providerAuthority: narrowedAuthority,
-      credentialSlotIds: broaderProposal.credentialSlotIds,
+      credentialBindings: [{
+        ...broaderProposal.credentialBindings[0],
+        providerAuthority: narrowedAuthority
+      }],
       grantExpiresAt: instant(9_000)
     }));
     expect(narrowed.warnings.map(warning => warning.code)).toEqual([
@@ -290,14 +299,29 @@ describe('authority request, consent, grant, revocation, and expiry algebras', (
 
     const unexpectedOperation = unwrapLifecycle(parseAuthorityAtom('admin'));
     const widenedAuthority: ProviderAuthority = {
-      ...broaderProposal.providerAuthority,
+      ...broaderProposal.credentialBindings[0].providerAuthority,
       requirements: operationRequirements(createAuthorityAtomSet(unexpectedOperation))
     };
     expect(reduceAuthorityRequest(parsedRequest(broaderProposal), {
       type: 'policy-accepted',
       at: instant(300),
-      providerAuthority: widenedAuthority,
-      credentialSlotIds: broaderProposal.credentialSlotIds,
+      credentialBindings: [{
+        ...broaderProposal.credentialBindings[0],
+        providerAuthority: widenedAuthority
+      }],
+      grantExpiresAt: instant(9_000)
+    })).toEqual(expect.objectContaining({
+      type: 'err',
+      issues: [expect.objectContaining({ code: 'authority-widened' })]
+    }));
+    const replacementSlot = unwrapBroker(parseCredentialSlotId('replacement-api'));
+    expect(reduceAuthorityRequest(parsedRequest(broaderProposal), {
+      type: 'policy-accepted',
+      at: instant(300),
+      credentialBindings: [{
+        ...broaderProposal.credentialBindings[0],
+        credentialSlotIds: createCredentialSlotSet(replacementSlot)
+      }],
       grantExpiresAt: instant(9_000)
     })).toEqual(expect.objectContaining({
       type: 'err',
@@ -365,7 +389,59 @@ describe('authority request, consent, grant, revocation, and expiry algebras', (
     expect(effect.expectedPredecessorGeneration).toBe(0);
     expect(validateGrantWithConsent(effect.command)).toEqual({ type: 'ok', value: effect.command });
     expect(effect.command.grant.issuedAtMs).toBe(effect.command.consent.occurredAtMs);
-    expect(effect.command.grant.credentialSlotIds).toEqual(effect.command.consent.credentialSlotIds);
+    expect(effect.command.grant.credentialBindings.map(binding => binding.slotId)).toEqual(
+      effect.command.consent.credentialSlotIds
+    );
+  });
+
+  it('derives exact heterogeneous slot mappings and rejects ambiguous binding groups', () => {
+    const base = proposal();
+    const alertsSlot = unwrapBroker(parseCredentialSlotId('alerts-api'));
+    const alertsReference = unwrapBroker(parseCredentialReference('alerts-secondary'));
+    const secondBinding = {
+      credentialReference: alertsReference,
+      credentialSlotIds: createCredentialSlotSet(alertsSlot),
+      providerAuthority: providerAuthority(['alerts'], ['alerts:read'])
+    } as const;
+    const multi = proposal({
+      credentialBindings: [base.credentialBindings[0], secondBinding]
+    });
+    const transition = unwrapLifecycle(deriveGrantFromApprovedRequest(approvedRequest(multi)));
+    const effect = commitEffect(transition);
+
+    expect(effect.command.grant.credentialBindings.map(binding => ({
+      slotId: binding.slotId,
+      reference: binding.credentialReference.value
+    }))).toEqual([
+      { slotId: 'weather-api', reference: 'weather-primary' },
+      { slotId: 'alerts-api', reference: 'alerts-secondary' }
+    ]);
+    expect(reduceAuthorityRequest(receivedRequest(), {
+      type: 'parsed',
+      at: instant(200),
+      proposal: proposal({
+        credentialBindings: [
+          base.credentialBindings[0],
+          { ...secondBinding, credentialSlotIds: base.credentialBindings[0].credentialSlotIds }
+        ]
+      })
+    })).toEqual(expect.objectContaining({
+      type: 'err',
+      issues: [expect.objectContaining({ code: 'authority-invalid' })]
+    }));
+    expect(reduceAuthorityRequest(receivedRequest(), {
+      type: 'parsed',
+      at: instant(200),
+      proposal: proposal({
+        credentialBindings: [
+          base.credentialBindings[0],
+          { ...secondBinding, credentialReference: base.credentialBindings[0].credentialReference }
+        ]
+      })
+    })).toEqual(expect.objectContaining({
+      type: 'err',
+      issues: [expect.objectContaining({ code: 'authority-invalid' })]
+    }));
   });
 
   it('correlates persistence, permits revocation with a new operation id, and closes terminal grants', () => {

@@ -7,6 +7,9 @@ describe('recipe-runner public entrypoint', () => {
     expect(Object.keys(recipeRunner).toSorted()).toEqual([
       'RECIPE_CANONICALIZATION',
       'RECIPE_REVISION_DOMAIN',
+      'RECIPE_RUNNER_LOCAL_READ_TIMEOUT_MS',
+      'RECIPE_RUNNER_MAX_ARG_COUNT',
+      'RECIPE_RUNNER_MAX_PATH_LENGTH',
       'RECIPE_SCHEMA',
       'RECIPE_TIMEOUT_MAX_MS',
       'RECIPE_XML_MAX_ATTRIBUTES',
@@ -18,8 +21,10 @@ describe('recipe-runner public entrypoint', () => {
       'buildExecuteRecipeRequest',
       'canonicalRecipeJson',
       'computeRecipeRevision',
+      'createBunNodeRecipeRunnerCliRuntime',
       'decodeAndAdmitRecipeXml',
       'decodeRecipeXml',
+      'executeRecipeRunnerCliPlan',
       'parseAuthorityAtom',
       'parseCredentialSlotId',
       'parseInjectionName',
@@ -28,10 +33,12 @@ describe('recipe-runner public entrypoint', () => {
       'parseRecipeId',
       'parseRecipeRelativePath',
       'parseRecipeRevision',
+      'parseRecipeRunnerCliPlan',
       'recipeErr',
       'recipeOk',
       'recipeRevisionDigestInput',
-      'recipeTry'
+      'recipeTry',
+      'runRecipeRunnerCli'
     ]);
     expect('Bun' in recipeRunner).toBe(false);
     expect('resolveAndAuthorizeExecution' in recipeRunner).toBe(false);

@@ -18,22 +18,24 @@ import {
   secretLeaseOk,
   secretLeaseTaskErr,
   secretLeaseTaskOk,
-  type ActiveSecretLease,
   type AuthorizedSecretLease,
+  type DeliveringSecretLease,
   type SecretLeaseIssues,
   type SecretLeaseResult,
   type SecretLeaseTaskResult
 } from './lease.ts';
 import {
-  activateAuthorizedSecretLease,
-  deliverActiveSecretLease,
+  beginAuthorizedSecretDelivery,
+  deliverDeliveringSecretLease,
   type BootstrapSecretContext,
   type BootstrapSecretPort,
   type BootstrapSecretReceipt,
   type BootstrapSecretSink,
   type BootstrapSecretSlot,
+  type ExposedSecretDelivery,
+  type RecoveryRequiredSecretDelivery,
   type SecretDeliveryClock,
-  type SecretDeliveryTerminal,
+  type SecretDeliveryOutcome,
   type SecretStoreLeasePort
 } from './secret-delivery.ts';
 
@@ -153,7 +155,8 @@ const acknowledgementReceipt = (
         leaseId: context.leaseId,
         processAttemptId: context.processAttemptId,
         installedSlotIds: context.slots.map(slot => slot.slotId),
-        secretsCleared: true
+        environmentInstalled: true,
+        brokerCopiesReleased: true
       })
     : mapProtocolFailure();
 };
@@ -210,8 +213,10 @@ const createBootstrapSecretPort = (
 
 const rejectionCode = (issues: SecretLeaseIssues): BootstrapRejectionCode => {
   switch (issues[0].code) {
+    case 'attempt-not-ready': return 'attempt-not-ready';
     case 'grant-expired': return 'grant-expired';
     case 'grant-revoked': return 'grant-revoked';
+    case 'recipe-drift': return 'recipe-drift';
     case 'secret-unavailable': return 'secret-unavailable';
     case 'slot-not-authorized': return 'slot-not-authorized';
     case 'bootstrap-rejected':
@@ -237,9 +242,11 @@ const revokeResolvedLease = <Value>(
   issues: SecretLeaseIssues
 ): SecretLeaseTaskResult<Value> => ports.authority.transitionLease({
   leaseId: lease.facts.id,
+  exposureCorrelation: lease.facts.exposureCorrelation,
   expectedState: 'authorized',
   nextState: 'revoked',
-  atMs
+  atMs,
+  cleanupReceipt: null
 }).andThen(() => secretLeaseTaskErr(issues[0], ...issues.slice(1)));
 
 const validateResolvedLease = (
@@ -253,58 +260,93 @@ const validateResolvedLease = (
     : revokeResolvedLease(lease, ports.clock.nowMs(), ports, validated.error);
 };
 
-const activateResolvedLease = (
+const beginResolvedDelivery = (
   lease: AuthorizedSecretLease,
   ports: BrokerBootstrapChildPorts
-): SecretLeaseTaskResult<ActiveSecretLease> => {
+): SecretLeaseTaskResult<DeliveringSecretLease> => {
   const atMs = ports.clock.nowMs();
-  const activated = activateAuthorizedSecretLease(lease, atMs);
-  return activated.isErr()
-    ? revokeResolvedLease<ActiveSecretLease>(lease, atMs, ports, activated.error)
+  const delivering = beginAuthorizedSecretDelivery(lease, atMs);
+  return delivering.isErr()
+    ? revokeResolvedLease<DeliveringSecretLease>(lease, atMs, ports, delivering.error)
     : ports.authority.transitionLease({
         leaseId: lease.facts.id,
+        exposureCorrelation: lease.facts.exposureCorrelation,
         expectedState: 'authorized',
-        nextState: 'active',
-        atMs
-      }).map(() => activated.value);
+        nextState: 'delivering',
+        atMs,
+        cleanupReceipt: null
+      }).map(() => delivering.value);
 };
 
-const persistDeliveryTerminal = (
-  terminal: SecretDeliveryTerminal,
+const persistExposure = (
+  delivery: ExposedSecretDelivery,
   ports: BrokerBootstrapChildPorts
-): SecretLeaseTaskResult<SecretDeliveryTerminal> => ports.authority.transitionLease({
-  leaseId: terminal.leaseId,
-  expectedState: 'active',
-  nextState: terminal.outcome === 'completed' ? 'consumed' : 'revoked',
-  atMs: terminal.outcome === 'completed' ? terminal.lease.completedAtMs : terminal.lease.revokedAtMs
-}).map(() => terminal);
+): SecretLeaseTaskResult<ExposedSecretDelivery> => ports.authority.transitionLease({
+  leaseId: delivery.leaseId,
+  exposureCorrelation: delivery.lease.facts.exposureCorrelation,
+  expectedState: 'delivering',
+  nextState: 'exposed',
+  atMs: delivery.lease.acknowledgedAtMs,
+  cleanupReceipt: null
+}).map(() => delivery);
 
-const revokeActiveDeliveryFailure = (
-  active: ActiveSecretLease,
+const persistDeliveryRecovery = (
+  delivery: RecoveryRequiredSecretDelivery,
   ports: BrokerBootstrapChildPorts,
-  issues: SecretLeaseIssues
-): SecretLeaseTaskResult<SecretDeliveryTerminal> => ports.authority.transitionLease({
-  leaseId: active.facts.id,
-  expectedState: 'active',
-  nextState: 'revoked',
-  atMs: ports.clock.nowMs()
-}).andThen(() => secretLeaseTaskErr(issues[0], ...issues.slice(1)));
+): SecretLeaseTaskResult<never> => ports.authority.transitionLease({
+  leaseId: delivery.leaseId,
+  exposureCorrelation: delivery.lease.facts.exposureCorrelation,
+  expectedState: 'delivering',
+  nextState: 'recovery-required',
+  atMs: delivery.lease.recoveryRequiredAtMs,
+  cleanupReceipt: null
+}).andThen(() => secretLeaseTaskErr({
+  code: 'bootstrap-rejected',
+  message: 'Secret delivery is ambiguous and requires exact process-tree recovery.'
+}));
+
+const persistDeliveryOutcome = (
+  delivery: SecretDeliveryOutcome,
+  ports: BrokerBootstrapChildPorts
+): SecretLeaseTaskResult<ExposedSecretDelivery> => delivery.outcome === 'exposed'
+  ? persistExposure(delivery, ports)
+  : persistDeliveryRecovery(delivery, ports);
+
+const persistExpiredExposureClosure = (
+  delivery: ExposedSecretDelivery,
+  ports: BrokerBootstrapChildPorts
+): SecretLeaseTaskResult<ExposedSecretDelivery> => {
+  const atMs = ports.clock.nowMs();
+  return atMs < delivery.lease.facts.expiresAtMs
+    ? secretLeaseTaskOk(delivery)
+    : ports.authority.transitionLease({
+        leaseId: delivery.leaseId,
+        exposureCorrelation: delivery.lease.facts.exposureCorrelation,
+        expectedState: 'exposed',
+        nextState: 'closure-required',
+        atMs,
+        cleanupReceipt: null
+      }).andThen(() => secretLeaseTaskErr({
+        code: 'lease-expired',
+        message: 'Secret exposure expired before bootstrap completion and requires exact process-tree closure.'
+      }));
+};
 
 const resolveAndDeliver = (
   request: BootstrapRequestMessage,
   exchangeId: string,
   timeoutMs: number,
   ports: BrokerBootstrapChildPorts
-): SecretLeaseTaskResult<SecretDeliveryTerminal> => ports.authority.resolveAuthorizedLease(request)
+): SecretLeaseTaskResult<ExposedSecretDelivery> => ports.authority.resolveAuthorizedLease(request)
   .andThen(lease => validateResolvedLease(request, lease, ports))
-  .andThen(lease => activateResolvedLease(lease, ports))
-  .orElse(issues => rejectAuthority<ActiveSecretLease>(ports.runtime, exchangeId, issues))
-  .andThen(active => deliverActiveSecretLease(active, {
+  .andThen(lease => beginResolvedDelivery(lease, ports))
+  .orElse(issues => rejectAuthority<DeliveringSecretLease>(ports.runtime, exchangeId, issues))
+  .andThen(delivering => deliverDeliveringSecretLease(delivering, {
     clock: ports.clock,
     secretStore: ports.secretStore,
     bootstrap: createBootstrapSecretPort(exchangeId, timeoutMs, ports.runtime)
-  }).andThen(terminal => persistDeliveryTerminal(terminal, ports))
-    .orElse(issues => revokeActiveDeliveryFailure(active, ports, issues)));
+  }).andThen(delivery => persistDeliveryOutcome(delivery, ports))
+    .andThen(delivery => persistExpiredExposureClosure(delivery, ports)));
 
 const disconnectAfter = <Value>(
   operation: SecretLeaseTaskResult<Value>,
@@ -324,7 +366,7 @@ const runPreparedChild = (
   ports: BrokerBootstrapChildPorts,
   exchangeId: string,
   timeoutMs: number
-): SecretLeaseTaskResult<SecretDeliveryTerminal> => {
+): SecretLeaseTaskResult<ExposedSecretDelivery> => {
   const operation = ports.runtime.send(helloWire(
     exchangeId,
     input.buildId ?? BROKER_BOOTSTRAP_BROKER_BUILD_ID
@@ -341,7 +383,7 @@ const runPreparedChild = (
 export const runBrokerBootstrapInheritedIpcChild = (
   input: BrokerBootstrapChildInput,
   ports: BrokerBootstrapChildPorts
-): SecretLeaseTaskResult<SecretDeliveryTerminal> => {
+): SecretLeaseTaskResult<ExposedSecretDelivery> => {
   const prepared = validExchangeId(input.exchangeId).andThen(exchangeId =>
     childTimeout(input.timeoutMs).map(timeoutMs => ({ exchangeId, timeoutMs }))
   );

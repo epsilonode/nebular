@@ -1,3 +1,3 @@
-import type { AdmittedRecipe } from '../../recipe-runner/model.ts';
+import type { AdmittedRecipe } from '../../recipe-runner/public.ts';
 
 export type BrokerRunnerReversal = AdmittedRecipe;

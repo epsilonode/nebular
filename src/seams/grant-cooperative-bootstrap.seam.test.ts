@@ -15,6 +15,7 @@ import { clientOk } from '../broker-client/result.ts';
 import {
   authorizeSecretLease,
   parseCredentialReference,
+  parseSecretExposureCorrelation,
   parseSecretLeaseId,
   type AuthorizedSecretLease,
   type SecretDeliveryGrant,
@@ -37,10 +38,12 @@ const authorizedLease = (): AuthorizedSecretLease => {
   const slotId = parseCredentialSlotId('weather-api');
   const credentialReference = parseCredentialReference('credential-1');
   const leaseId = parseSecretLeaseId('lease-1');
+  const exposureCorrelation = parseSecretExposureCorrelation('exposure-1');
   const receiverId = parseReceiverId('pm2');
   const processAttemptId = parseProcessAttemptId('attempt-1');
   if (repository.isErr() || recipeRevision.isErr() || grantId.isErr() || slotId.isErr() ||
-      credentialReference.isErr() || leaseId.isErr() || receiverId.isErr() || processAttemptId.isErr()) {
+      credentialReference.isErr() || leaseId.isErr() || exposureCorrelation.isErr() || receiverId.isErr() ||
+      processAttemptId.isErr()) {
     throw new Error('expected valid grant-to-cooperative-bootstrap fixture');
   }
   const binding: SecretSlotBinding = {
@@ -66,6 +69,7 @@ const authorizedLease = (): AuthorizedSecretLease => {
     recipeRevision: recipeRevision.value,
     receiverId: receiverId.value,
     processAttemptId: processAttemptId.value,
+    exposureCorrelation: exposureCorrelation.value,
     bindings: [binding],
     requestedAtMs: 1_000,
     expiresAtMs: 1_500,

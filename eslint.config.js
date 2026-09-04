@@ -69,6 +69,7 @@ export default tseslint.config(
       'boundaries/elements': [
         { type: 'teleport', pattern: 'src/teleport/**' },
         { type: 'broker-client', pattern: 'src/broker-client/**' },
+        { type: 'recipe-contract', pattern: 'src/recipe-contract/**' },
         { type: 'recipe-runner', pattern: 'src/recipe-runner/**' },
         { type: 'broker', pattern: 'src/broker/**' }
       ]
@@ -86,12 +87,16 @@ export default tseslint.config(
             allow: { to: { element: { types: ['teleport', 'broker-client'] } } }
           },
           {
+            from: { element: { type: 'recipe-contract' } },
+            allow: { to: { element: { type: 'recipe-contract' } } }
+          },
+          {
             from: { element: { type: 'recipe-runner' } },
-            allow: { to: { element: { types: ['teleport', 'broker-client', 'recipe-runner'] } } }
+            allow: { to: { element: { types: ['teleport', 'broker-client', 'recipe-contract', 'recipe-runner'] } } }
           },
           {
             from: { element: { type: 'broker' } },
-            allow: { to: { element: { types: ['teleport', 'broker-client', 'broker'] } } }
+            allow: { to: { element: { types: ['teleport', 'broker-client', 'recipe-contract', 'broker'] } } }
           }
         ]
       }],
@@ -108,7 +113,7 @@ export default tseslint.config(
       }],
       'no-restricted-imports': ['error', {
         patterns: [{
-          regex: '^(?:\\.\\./)+(?:teleport|broker-client|recipe-runner|broker)/(?!public\\.ts$)',
+          regex: '^(?:\\.\\./)+(?:teleport|broker-client|recipe-contract|recipe-runner|broker)/(?!public\\.ts$)',
           message: 'Cross-domain imports must use the owning domain public.ts surface.'
         }]
       }]
@@ -240,14 +245,11 @@ export default tseslint.config(
   {
     files: [
       'src/broker/result.ts',
-      'src/broker/authority.ts',
       'src/broker/bootstrap-authority.ts',
       'src/broker/bun-bootstrap-inherited-ipc.ts',
-      'src/broker/bun-inherited-ipc.ts',
       'src/broker/bun-secret-store.ts',
       'src/broker/effect-runtime.ts',
       'src/broker/lease.ts',
-      'src/broker/operation.ts',
       'src/broker/provider-contract.ts',
       'src/broker/receiver.ts',
       'src/broker/secret-delivery.ts',
@@ -281,6 +283,46 @@ export default tseslint.config(
     rules: {
       // The Bun SQLite module and Database handles are mutable foreign values.
       // The adapter confines them to one operation-scoped open/close lifecycle.
+      'functional/prefer-immutable-types': 'off'
+    }
+  },
+  {
+    files: ['src/broker/pm2-monitor-projection.ts'],
+    rules: {
+      // The monitor response can contain every PM2 application's environment.
+      // This leaf uses a bounded byte scanner and explicitly wipes its mutable
+      // input instead of materializing the foreign JSON or secret-bearing values.
+      'functional/immutable-data': 'off',
+      'functional/no-let': 'off',
+      'functional/no-loop-statements': 'off',
+      'functional/prefer-immutable-types': 'off'
+    }
+  },
+  {
+    files: ['src/broker/pm2-application-rpc.ts'],
+    rules: {
+      // The PM2 socket boundary owns a bounded secret-bearing receive buffer.
+      // Mutation is limited to append-and-wipe mechanics before projection.
+      'functional/immutable-data': 'off',
+      'functional/prefer-immutable-types': 'off',
+      'functional/type-declaration-immutability': 'off'
+    }
+  },
+  {
+    files: ['src/broker/bun-windows-filesystem-facts.ts'],
+    rules: {
+      // Win32 FFI fills mutable typed-array structures and exposes mutable
+      // library symbol wrappers. Mutation remains confined to this leaf; its
+      // public facts, sessions, observations, and results are readonly.
+      'functional/prefer-immutable-types': 'off'
+    }
+  },
+  {
+    files: ['src/broker/windows-named-mutex-allocation.ts'],
+    rules: {
+      // Win32 mutexes are thread-recursive. This one opaque promise-tail map
+      // serializes same-thread async callers before the cross-process mutex.
+      'functional/immutable-data': 'off',
       'functional/prefer-immutable-types': 'off'
     }
   },

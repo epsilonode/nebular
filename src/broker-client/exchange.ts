@@ -5,7 +5,12 @@ import {
   type BrokerProgressMessage,
   type BrokerTerminalMessage
 } from './ipc.ts';
-import { parseBrokerSequence, type BrokerRequestId, type BrokerSequence } from './primitives.ts';
+import {
+  parseBrokerSequence,
+  type BrokerAttemptId,
+  type BrokerRequestId,
+  type BrokerSequence
+} from './primitives.ts';
 import { clientErr, clientOk, type BrokerClientResult } from './result.ts';
 
 export const BROKER_REQUEST_CANCELLED_CODE = 'request-cancelled' as const;
@@ -16,10 +21,15 @@ export type BrokerExchangeDirection = 'broker-to-client' | 'client-to-broker';
 export type BrokerClientProgress = BrokerProgressMessage['payload'];
 
 export type BrokerClientTerminalOutcome =
-  | Readonly<{ outcome: 'success'; code: string; message: string }>
-  | Readonly<{ outcome: 'failure'; code: string; message: string }>
-  | Readonly<{ outcome: 'cancelled'; code: typeof BROKER_REQUEST_CANCELLED_CODE; message: string }>
-  | Readonly<{ outcome: 'protocol-error'; code: string; message: string }>
+  | Readonly<{ outcome: 'success'; code: string; message: string; attemptId?: BrokerAttemptId }>
+  | Readonly<{ outcome: 'failure'; code: string; message: string; attemptId?: BrokerAttemptId }>
+  | Readonly<{
+      outcome: 'cancelled';
+      code: typeof BROKER_REQUEST_CANCELLED_CODE;
+      message: string;
+      attemptId?: BrokerAttemptId;
+    }>
+  | Readonly<{ outcome: 'protocol-error'; code: string; message: string; attemptId?: BrokerAttemptId }>
   | Readonly<{ outcome: 'disconnected'; reason: BrokerDisconnectReason; detail: string }>;
 
 type BrokerExchangeIdentity = Readonly<{
@@ -120,15 +130,27 @@ const terminalOutcome = (message: BrokerTerminalMessage): BrokerClientTerminalOu
     .with('terminal-success', (): BrokerClientTerminalOutcome => ({
       outcome: 'success',
       code: message.payload.code,
-      message: message.payload.message
+      message: message.payload.message,
+      ...(message.attemptId === undefined ? {} : { attemptId: message.attemptId })
     }))
     .with('terminal-failure', (): BrokerClientTerminalOutcome => message.payload.code === BROKER_REQUEST_CANCELLED_CODE
-      ? { outcome: 'cancelled', code: BROKER_REQUEST_CANCELLED_CODE, message: message.payload.message }
-      : { outcome: 'failure', code: message.payload.code, message: message.payload.message })
+      ? {
+          outcome: 'cancelled',
+          code: BROKER_REQUEST_CANCELLED_CODE,
+          message: message.payload.message,
+          ...(message.attemptId === undefined ? {} : { attemptId: message.attemptId })
+        }
+      : {
+          outcome: 'failure',
+          code: message.payload.code,
+          message: message.payload.message,
+          ...(message.attemptId === undefined ? {} : { attemptId: message.attemptId })
+        })
     .with('protocol-error', (): BrokerClientTerminalOutcome => ({
       outcome: 'protocol-error',
       code: message.payload.code,
-      message: message.payload.message
+      message: message.payload.message,
+      ...(message.attemptId === undefined ? {} : { attemptId: message.attemptId })
     }))
     .exhaustive();
 
@@ -143,6 +165,13 @@ const transitionTerminal = (
 ): BrokerClientResult<BrokerClientExchange> => {
   if ((exchange.state !== 'active' && exchange.state !== 'cancellation-requested') || !isTerminalMessage(message)) {
     return clientErr({ code: 'protocol-mismatch', message: 'A terminal result is not legal in the current broker exchange state.' });
+  }
+  if (exchange.state === 'cancellation-requested' &&
+      (message.messageKind !== 'terminal-failure' || message.payload.code !== BROKER_REQUEST_CANCELLED_CODE)) {
+    return clientErr({
+      code: 'protocol-mismatch',
+      message: 'Only cleanup-gated cancellation may complete an accepted broker cancellation.'
+    });
   }
   return nextSequence(message.sequence).map(sequence => ({
     state: 'terminal',
@@ -186,11 +215,9 @@ const reduceControlFrame = (
     .with(['awaiting-hello', 'broker-to-client', 'hello'], () => transitionHello(exchange, message))
     .with(['ready', 'client-to-broker', 'request'], () => transitionRequest(exchange, message))
     .with(['active', 'broker-to-client', 'progress'], () => transitionProgress(exchange, message))
-    .with(['cancellation-requested', 'broker-to-client', 'progress'], () => transitionProgress(exchange, message))
     .with(['active', 'client-to-broker', 'cancel'], () => transitionCancel(exchange, message))
     .with(['active', 'broker-to-client', 'terminal-success'], () => transitionTerminal(exchange, message))
     .with(['active', 'broker-to-client', 'terminal-failure'], () => transitionTerminal(exchange, message))
-    .with(['cancellation-requested', 'broker-to-client', 'terminal-success'], () => transitionTerminal(exchange, message))
     .with(['cancellation-requested', 'broker-to-client', 'terminal-failure'], () => transitionTerminal(exchange, message))
     .with(['awaiting-hello', 'broker-to-client', 'protocol-error'], () => transitionProtocolError(exchange, message))
     .with(['ready', 'broker-to-client', 'protocol-error'], () => transitionProtocolError(exchange, message))
@@ -200,6 +227,27 @@ const reduceControlFrame = (
       code: 'protocol-mismatch',
       message: 'Broker control direction or message kind is not legal in the current exchange state.'
     }));
+};
+
+const reduceInFlightCompletionThatWonCancelRace = (
+  exchange: Extract<BrokerClientExchange, { state: 'cancellation-requested' }>,
+  direction: BrokerExchangeDirection,
+  message: BrokerControlMessage
+): BrokerClientResult<BrokerClientExchange> | undefined => {
+  const completionFrame = message.messageKind === 'progress' || message.messageKind === 'terminal-success' ||
+    message.messageKind === 'terminal-failure' || message.messageKind === 'protocol-error';
+  if (direction !== 'broker-to-client' || !completionFrame || message.sequence + 1 !== exchange.nextSequence) {
+    return undefined;
+  }
+  // The broker may have committed sequence N immediately before the client
+  // emitted cancel sequence N. In that sole collision, the already-in-flight
+  // broker completion wins and the ordinary active transition is replayed.
+  return reduceControlFrame({
+    state: 'active',
+    requestId: exchange.requestId,
+    nextSequence: message.sequence,
+    progress: exchange.progress
+  }, direction, message);
 };
 
 const reduceDisconnect = (
@@ -226,6 +274,10 @@ export const reduceBrokerClientExchange = (
 ): BrokerClientResult<BrokerClientExchange> => {
   if (exchange.state === 'terminal') {
     return clientErr({ code: 'session-closed', message: 'Broker exchange already has its single terminal outcome.' });
+  }
+  if (event.eventKind === 'control' && exchange.state === 'cancellation-requested') {
+    const raced = reduceInFlightCompletionThatWonCancelRace(exchange, event.direction, event.message);
+    if (raced !== undefined) return raced;
   }
   return event.eventKind === 'disconnect'
     ? reduceDisconnect(exchange, event)

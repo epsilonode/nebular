@@ -31,6 +31,8 @@ export const BOOTSTRAP_RESERVED_ENVIRONMENT_NAMES = [
   'LD_PRELOAD',
   'NODE_OPTIONS',
   'NODE_PATH',
+  'PATH',
+  'PATHEXT',
   'PERL5LIB',
   'PERL5OPT',
   'PYTHONHOME',
@@ -103,6 +105,18 @@ export type CooperativeBootstrapPorts = Readonly<{
   transport: CooperativeBootstrapTransportPort;
 }>;
 
+export const BOOTSTRAP_NOT_READY_MAXIMUM_ATTEMPTS = 32;
+export const BOOTSTRAP_NOT_READY_MAXIMUM_DELAY_MS = 1_000;
+
+export type BootstrapNotReadyRetryPolicy = Readonly<{
+  maximumAttempts: number;
+  delayMs: number;
+}>;
+
+export type BootstrapNotReadyRetryPort = Readonly<{
+  wait: (delayMs: number) => Promise<void>;
+}>;
+
 export type PrepareRecipeEnvironmentInput = Readonly<{
   request: BootstrapRequestMessage;
   inheritedEnvironmentNames: readonly string[];
@@ -130,6 +144,7 @@ export type PreparedApplication<Module> = Readonly<{
 const foldEnvironmentName = (value: string): string => value.toUpperCase();
 
 const isReservedEnvironmentName = (value: string): boolean =>
+  foldEnvironmentName(value).startsWith('NEBULAR_') ||
   BOOTSTRAP_RESERVED_ENVIRONMENT_NAMES.some(name => name === foldEnvironmentName(value));
 
 const isValidEnvironmentName = (value: string): boolean =>
@@ -275,6 +290,7 @@ const preparedEnvironment = (
 const rejectionMessage = (rejection: BootstrapRejectedMessage): string => {
   switch (rejection.payload.code) {
     case 'attempt-mismatch': return 'The broker rejected the managed process attempt.';
+    case 'attempt-not-ready': return 'The managed process is waiting for its current receiver binding.';
     case 'authority-denied': return 'The broker denied bootstrap authority.';
     case 'grant-expired': return 'The repository-scoped grant has expired.';
     case 'grant-revoked': return 'The repository-scoped grant is revoked.';
@@ -284,6 +300,13 @@ const rejectionMessage = (rejection: BootstrapRejectedMessage): string => {
     case 'slot-not-authorized': return 'A requested credential slot is not authorized.';
   }
 };
+
+const rejectionIssue = (rejection: BootstrapRejectedMessage) => ({
+  code: rejection.payload.code === 'attempt-not-ready'
+    ? 'bootstrap-not-ready' as const
+    : 'bootstrap-rejected' as const,
+  message: rejectionMessage(rejection)
+});
 
 const prepareDelivery = (
   input: PrepareRecipeEnvironmentInput,
@@ -297,10 +320,7 @@ const prepareDelivery = (
     }));
   }
   if (response.messageKind === 'bootstrap-rejected') {
-    return Promise.resolve(clientErr({
-      code: 'bootstrap-rejected',
-      message: rejectionMessage(response)
-    }));
+    return Promise.resolve(clientErr(rejectionIssue(response)));
   }
   const planned = planBootstrapEnvironmentPatch(
     input.request,
@@ -348,11 +368,66 @@ const prepareRecipeEnvironmentExchange = (
     response => prepareDelivery(input, response, ports)
   );
 
+const validRetryPolicy = (policy: BootstrapNotReadyRetryPolicy): boolean =>
+  Number.isSafeInteger(policy.maximumAttempts) && policy.maximumAttempts > 0 &&
+  policy.maximumAttempts <= BOOTSTRAP_NOT_READY_MAXIMUM_ATTEMPTS &&
+  Number.isSafeInteger(policy.delayMs) && policy.delayMs > 0 &&
+  policy.delayMs <= BOOTSTRAP_NOT_READY_MAXIMUM_DELAY_MS;
+
+const retryUnavailable = <Value>(): BrokerClientResult<Value> => clientErr({
+  code: 'transport-unavailable',
+  message: 'Bootstrap retry scheduling is unavailable.'
+});
+
+const isNotReady = <Value>(result: BrokerClientResult<Value>): boolean =>
+  result.isErr() && result.error[0].code === 'bootstrap-not-ready';
+
+const retryNotReady = <Value>(
+  operation: () => Promise<BrokerClientResult<Value>>,
+  retry: BootstrapNotReadyRetryPort,
+  policy: BootstrapNotReadyRetryPolicy,
+  attemptNumber: number
+): Promise<BrokerClientResult<Value>> => Promise.resolve().then(operation).then(
+  result => isNotReady(result) && attemptNumber < policy.maximumAttempts
+    ? Promise.resolve().then(() => retry.wait(policy.delayMs)).then(
+        () => retryNotReady(operation, retry, policy, attemptNumber + 1),
+        () => retryUnavailable<Value>()
+      )
+    : result,
+  () => retryUnavailable<Value>()
+);
+
+const prepareRecipeEnvironmentExchangeWithRetry = (
+  input: PrepareRecipeEnvironmentInput,
+  ports: CooperativeBootstrapPorts,
+  retry: BootstrapNotReadyRetryPort,
+  policy: BootstrapNotReadyRetryPolicy
+): Promise<BrokerClientResult<BootstrapExchangeCompletion<PreparedRecipeEnvironment>>> =>
+  validRetryPolicy(policy)
+    ? retryNotReady(() => prepareRecipeEnvironmentExchange(input, ports), retry, policy, 1)
+    : Promise.resolve(clientErr({
+        code: 'invalid-input',
+        message: 'Bootstrap not-ready retry policy is invalid.'
+      }));
+
 export const prepareRecipeEnvironment = (
   input: PrepareRecipeEnvironmentInput,
   ports: CooperativeBootstrapPorts
 ): Promise<BrokerClientResult<PreparedRecipeEnvironment>> =>
   prepareRecipeEnvironmentExchange(input, ports).then(result => result.map(completion => completion.value));
+
+export const prepareRecipeEnvironmentWithRetry = (
+  input: PrepareRecipeEnvironmentInput,
+  ports: CooperativeBootstrapPorts,
+  retry: BootstrapNotReadyRetryPort,
+  policy: BootstrapNotReadyRetryPolicy
+): Promise<BrokerClientResult<PreparedRecipeEnvironment>> =>
+  prepareRecipeEnvironmentExchangeWithRetry(input, ports, retry, policy)
+    .then(result => result.map(completion => completion.value));
+
+export const createBootstrapNotReadyRetryPort = (): BootstrapNotReadyRetryPort => ({
+  wait: delayMs => new Promise(resolve => setTimeout(resolve, delayMs))
+});
 
 const loadDeferredApplication = <Module>(
   deferredImport: () => PromiseLike<Module>
@@ -372,6 +447,29 @@ export const prepareRecipeEnvironmentThenImport = <Module>(
   deferredImport: () => PromiseLike<Module>
 ): Promise<BrokerClientResult<PreparedApplication<Module>>> =>
   prepareRecipeEnvironmentExchange(input, ports).then(prepared => prepared.isErr()
+    ? clientErr(prepared.error[0], ...prepared.error.slice(1))
+    : loadDeferredApplication(deferredImport).then(application => application.isOk()
+      ? clientOk({
+          environment: prepared.value.value,
+          application: application.value
+        })
+      : failAfterEnvironmentRollback<PreparedApplication<Module>>(
+          {
+            atomic: true,
+            installedSlots: prepared.value.value.installedSlots,
+            cleanup: prepared.value.cleanup
+          },
+           [application.error[0], ...application.error.slice(1)]
+        )));
+
+export const prepareRecipeEnvironmentThenImportWithRetry = <Module>(
+  input: PrepareRecipeEnvironmentInput,
+  ports: CooperativeBootstrapPorts,
+  retry: BootstrapNotReadyRetryPort,
+  policy: BootstrapNotReadyRetryPolicy,
+  deferredImport: () => PromiseLike<Module>
+): Promise<BrokerClientResult<PreparedApplication<Module>>> =>
+  prepareRecipeEnvironmentExchangeWithRetry(input, ports, retry, policy).then(prepared => prepared.isErr()
     ? clientErr(prepared.error[0], ...prepared.error.slice(1))
     : loadDeferredApplication(deferredImport).then(application => application.isOk()
       ? clientOk({

@@ -4,6 +4,6 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["bun"]
   },
-  "include": ["recipe-runner.ts", "src/recipe-runner/**/*.ts"],
+  "include": ["recipe-runner.ts", "src/recipe-contract/**/*.ts", "src/recipe-runner/**/*.ts"],
   "exclude": ["src/**/*.test.ts", "src/**/__lint_negative__/**"]
 }

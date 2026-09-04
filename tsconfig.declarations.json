@@ -19,6 +19,7 @@
     "broker.ts",
     "src/teleport/**/*.ts",
     "src/broker-client/**/*.ts",
+    "src/recipe-contract/**/*.ts",
     "src/recipe-runner/**/*.ts",
     "src/broker/**/*.ts"
   ],

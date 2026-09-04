@@ -11,12 +11,14 @@ import type {
 } from './primitives.ts';
 
 export type SecretLeaseIssueCode =
+  | 'attempt-not-ready'
   | 'bootstrap-rejected'
   | 'grant-expired'
   | 'grant-revoked'
   | 'lease-expired'
   | 'lease-invalid'
   | 'lease-transition-invalid'
+  | 'recipe-drift'
   | 'secret-input-invalid'
   | 'secret-store-failed'
   | 'secret-unavailable'
@@ -49,8 +51,16 @@ type OpaqueReference<Kind extends string> = Readonly<{
 
 export type CredentialReference = OpaqueReference<'credential-reference'>;
 export type SecretLeaseId = OpaqueReference<'secret-lease-id'>;
+export type SecretExposureCorrelation = OpaqueReference<'secret-exposure-correlation'>;
+export type SecretExposureCleanupReceiptId = OpaqueReference<'secret-exposure-cleanup-receipt-id'>;
 
-const parseReference = <Kind extends CredentialReference['kind'] | SecretLeaseId['kind']>(
+type SecretLeaseReferenceKind =
+  | CredentialReference['kind']
+  | SecretLeaseId['kind']
+  | SecretExposureCorrelation['kind']
+  | SecretExposureCleanupReceiptId['kind'];
+
+const parseReference = <Kind extends SecretLeaseReferenceKind>(
   kind: Kind,
   value: unknown
 ): SecretLeaseResult<OpaqueReference<Kind>> =>
@@ -62,6 +72,11 @@ export const parseCredentialReference = (value: unknown): SecretLeaseResult<Cred
   parseReference('credential-reference', value);
 export const parseSecretLeaseId = (value: unknown): SecretLeaseResult<SecretLeaseId> =>
   parseReference('secret-lease-id', value);
+export const parseSecretExposureCorrelation = (value: unknown): SecretLeaseResult<SecretExposureCorrelation> =>
+  parseReference('secret-exposure-correlation', value);
+export const parseSecretExposureCleanupReceiptId = (
+  value: unknown
+): SecretLeaseResult<SecretExposureCleanupReceiptId> => parseReference('secret-exposure-cleanup-receipt-id', value);
 
 export type SecretSlotBinding = Readonly<{
   slotId: CredentialSlotId;
@@ -88,6 +103,7 @@ export type SecretLeaseRequest = Readonly<{
   recipeRevision: RecipeRevision;
   receiverId: ReceiverId;
   processAttemptId: ProcessAttemptId;
+  exposureCorrelation: SecretExposureCorrelation;
   bindings: readonly SecretSlotBinding[];
   requestedAtMs: number;
   expiresAtMs: number;
@@ -102,6 +118,7 @@ export type SecretLeaseFacts = Readonly<{
   recipeRevision: RecipeRevision;
   receiverId: ReceiverId;
   processAttemptId: ProcessAttemptId;
+  exposureCorrelation: SecretExposureCorrelation;
   bindings: readonly SecretSlotBinding[];
   authorizedAtMs: number;
   expiresAtMs: number;
@@ -113,24 +130,50 @@ export type AuthorizedSecretLease = Readonly<{
   facts: SecretLeaseFacts;
 }>;
 
-export type ActiveSecretLease = Readonly<{
-  state: 'active';
+export type DeliveringSecretLease = Readonly<{
+  state: 'delivering';
   facts: SecretLeaseFacts;
-  activatedAtMs: number;
+  deliveryStartedAtMs: number;
 }>;
 
-export type ConsumedSecretLease = Readonly<{
-  state: 'consumed';
+export type ExposedSecretLease = Readonly<{
+  state: 'exposed';
   facts: SecretLeaseFacts;
-  activatedAtMs: number;
-  completedAtMs: number;
+  deliveryStartedAtMs: number;
+  acknowledgedAtMs: number;
 }>;
 
 export type SecretLeaseRevocationReason =
   | 'bootstrap-rejected'
+  | 'cancelled'
   | 'grant-revoked'
   | 'lease-expired'
-  | 'secret-unavailable';
+  | 'secret-unavailable'
+  | 'target-terminal';
+
+export type SecretExposureClosureReason =
+  | 'cancelled'
+  | 'grant-revoked'
+  | 'lease-expired'
+  | 'target-terminal';
+
+export type SecretExposureRecoveryReason =
+  | 'acknowledgement-ambiguous'
+  | 'cleanup-ambiguous'
+  | 'delivery-failed'
+  | 'journal-ambiguous';
+
+export type SecretExposureRecoveryPhase = 'authorization' | 'delivery' | 'exposure' | 'closure';
+
+export type SecretExposureCleanupReceipt = Readonly<{
+  format: 'secret-exposure-cleanup-receipt/v1';
+  id: SecretExposureCleanupReceiptId;
+  exposureCorrelation: SecretExposureCorrelation;
+  receiverId: ReceiverId;
+  processAttemptId: ProcessAttemptId;
+  proof: 'exact-tree-empty';
+  observedAtMs: number;
+}>;
 
 export type RevokedSecretLease = Readonly<{
   state: 'revoked';
@@ -139,23 +182,72 @@ export type RevokedSecretLease = Readonly<{
   reason: SecretLeaseRevocationReason;
 }>;
 
-export type SecretLease = AuthorizedSecretLease | ActiveSecretLease | ConsumedSecretLease | RevokedSecretLease;
+export type ClosureRequiredSecretLease = Readonly<{
+  state: 'closure-required';
+  facts: SecretLeaseFacts;
+  deliveryStartedAtMs: number;
+  acknowledgedAtMs: number;
+  closureRequiredAtMs: number;
+  reason: SecretExposureClosureReason;
+}>;
+
+export type ClosedSecretLease = Readonly<{
+  state: 'closed';
+  facts: SecretLeaseFacts;
+  closedAtMs: number;
+  cleanupReceipt: SecretExposureCleanupReceipt;
+}>;
+
+export type RecoveryRequiredSecretLease = Readonly<{
+  state: 'recovery-required';
+  facts: SecretLeaseFacts;
+  deliveryStartedAtMs: number | null;
+  acknowledgedAtMs: number | null;
+  recoveryRequiredAtMs: number;
+  phase: SecretExposureRecoveryPhase;
+  reason: SecretExposureRecoveryReason;
+}>;
+
+export type SecretLease =
+  | AuthorizedSecretLease
+  | DeliveringSecretLease
+  | ExposedSecretLease
+  | ClosureRequiredSecretLease
+  | ClosedSecretLease
+  | RevokedSecretLease
+  | RecoveryRequiredSecretLease;
 
 export type SecretLeaseEvent =
-  | Readonly<{ type: 'activate'; atMs: number }>
-  | Readonly<{ type: 'complete'; atMs: number }>
-  | Readonly<{ type: 'expire'; atMs: number }>
-  | Readonly<{ type: 'revoke'; atMs: number; reason: SecretLeaseRevocationReason }>;
+  | Readonly<{ type: 'begin-delivery'; atMs: number }>
+  | Readonly<{ type: 'acknowledge-exposure'; atMs: number }>
+  | Readonly<{ type: 'revoke-unexposed'; atMs: number; reason: SecretLeaseRevocationReason }>
+  | Readonly<{ type: 'request-closure'; atMs: number; reason: SecretExposureClosureReason }>
+  | Readonly<{ type: 'require-recovery'; atMs: number; reason: SecretExposureRecoveryReason }>
+  | Readonly<{ type: 'close'; atMs: number; receipt: SecretExposureCleanupReceipt }>;
 
 const reservedEnvironmentNames: readonly string[] = [
   'BUN_OPTIONS',
+  'CLASSPATH',
   'DYLD_INSERT_LIBRARIES',
+  'DYLD_LIBRARY_PATH',
+  'JAVA_TOOL_OPTIONS',
+  'LD_LIBRARY_PATH',
   'LD_PRELOAD',
-  'NODE_OPTIONS'
+  'NODE_OPTIONS',
+  'NODE_PATH',
+  'PATH',
+  'PATHEXT',
+  'PERL5LIB',
+  'PERL5OPT',
+  'PYTHONHOME',
+  'PYTHONPATH',
+  'RUBYOPT',
+  '_JAVA_OPTIONS'
 ];
 
 const isValidEnvironmentName = (value: string): boolean =>
   /^[A-Za-z_][A-Za-z0-9_]*$/u.test(value) &&
+  !value.toUpperCase().startsWith('NEBULAR_') &&
   !reservedEnvironmentNames.includes(value.toUpperCase());
 
 const hasDuplicates = (values: readonly string[]): boolean =>
@@ -221,6 +313,7 @@ export const authorizeSecretLease = (
       recipeRevision: request.recipeRevision,
       receiverId: request.receiverId,
       processAttemptId: request.processAttemptId,
+      exposureCorrelation: request.exposureCorrelation,
       bindings: request.bindings,
       authorizedAtMs: nowMs,
       expiresAtMs: request.expiresAtMs,
@@ -229,119 +322,145 @@ export const authorizeSecretLease = (
   });
 };
 
-const revoke = (
-  lease: AuthorizedSecretLease | ActiveSecretLease,
-  event: Extract<SecretLeaseEvent, { type: 'expire' | 'revoke' }>
-): SecretLeaseResult<RevokedSecretLease> =>
-  event.type === 'expire' && event.atMs < lease.facts.expiresAtMs
-    ? secretLeaseErr({ code: 'lease-transition-invalid', message: 'A secret lease cannot expire before its deadline.' })
-    : secretLeaseOk({
-        state: 'revoked',
-        facts: lease.facts,
-        revokedAtMs: event.atMs,
-        reason: event.type === 'expire' ? 'lease-expired' : event.reason
-      });
+const invalidTransition = (): SecretLeaseResult<SecretLease> => secretLeaseErr({
+  code: 'lease-transition-invalid',
+  message: 'The secret-exposure transition is not permitted from its current state.'
+});
 
-type AuthorizedActivationMatch = Readonly<{
-  lease: AuthorizedSecretLease;
-  event: Extract<SecretLeaseEvent, { type: 'activate' }>;
-}>;
+const validEventTime = (lease: SecretLease, atMs: number): boolean =>
+  Number.isSafeInteger(atMs) && atMs >= lease.facts.authorizedAtMs;
 
-type ActiveCompletionMatch = Readonly<{
-  lease: ActiveSecretLease;
-  event: Extract<SecretLeaseEvent, { type: 'complete' }>;
-}>;
+const cleanupReceiptMatches = (
+  lease: ClosureRequiredSecretLease | RecoveryRequiredSecretLease,
+  event: Extract<SecretLeaseEvent, { type: 'close' }>
+): boolean => event.atMs === event.receipt.observedAtMs && validEventTime(lease, event.atMs) &&
+  event.receipt.exposureCorrelation.value === lease.facts.exposureCorrelation.value &&
+  event.receipt.receiverId === lease.facts.receiverId &&
+  event.receipt.processAttemptId === lease.facts.processAttemptId;
 
-type AuthorizedExpirationMatch = Readonly<{
-  lease: AuthorizedSecretLease;
-  event: Extract<SecretLeaseEvent, { type: 'expire' }>;
-}>;
+const beginDelivery = (
+  lease: AuthorizedSecretLease,
+  event: Extract<SecretLeaseEvent, { type: 'begin-delivery' }>
+): SecretLeaseResult<SecretLease> => validEventTime(lease, event.atMs) && event.atMs < lease.facts.expiresAtMs
+  ? secretLeaseOk({ state: 'delivering', facts: lease.facts, deliveryStartedAtMs: event.atMs })
+  : secretLeaseErr({ code: 'lease-expired', message: 'Secret delivery cannot begin outside its authority window.' });
 
-type AuthorizedRevocationMatch = Readonly<{
-  lease: AuthorizedSecretLease;
-  event: Extract<SecretLeaseEvent, { type: 'revoke' }>;
-}>;
+const acknowledgeExposure = (
+  lease: DeliveringSecretLease,
+  event: Extract<SecretLeaseEvent, { type: 'acknowledge-exposure' }>
+): SecretLeaseResult<SecretLease> => validEventTime(lease, event.atMs) && event.atMs >= lease.deliveryStartedAtMs
+  ? secretLeaseOk({
+      state: 'exposed',
+      facts: lease.facts,
+      deliveryStartedAtMs: lease.deliveryStartedAtMs,
+      acknowledgedAtMs: event.atMs
+    })
+  : invalidTransition();
 
-type ActiveExpirationMatch = Readonly<{
-  lease: ActiveSecretLease;
-  event: Extract<SecretLeaseEvent, { type: 'expire' }>;
-}>;
+const revokeUnexposed = (
+  lease: AuthorizedSecretLease,
+  event: Extract<SecretLeaseEvent, { type: 'revoke-unexposed' }>
+): SecretLeaseResult<SecretLease> => validEventTime(lease, event.atMs) &&
+  (event.reason !== 'lease-expired' || event.atMs >= lease.facts.expiresAtMs)
+  ? secretLeaseOk({ state: 'revoked', facts: lease.facts, revokedAtMs: event.atMs, reason: event.reason })
+  : invalidTransition();
 
-type ActiveRevocationMatch = Readonly<{
-  lease: ActiveSecretLease;
-  event: Extract<SecretLeaseEvent, { type: 'revoke' }>;
-}>;
+const requireDeliveryRecovery = (
+  lease: DeliveringSecretLease,
+  event: Extract<SecretLeaseEvent, { type: 'require-recovery' }>
+): SecretLeaseResult<SecretLease> => validEventTime(lease, event.atMs) && event.atMs >= lease.deliveryStartedAtMs
+  ? secretLeaseOk({
+      state: 'recovery-required',
+      facts: lease.facts,
+      deliveryStartedAtMs: lease.deliveryStartedAtMs,
+      acknowledgedAtMs: null,
+      recoveryRequiredAtMs: event.atMs,
+      phase: 'delivery',
+      reason: event.reason
+    })
+  : invalidTransition();
 
-const activateAuthorizedLease = (
-  { lease, event }: AuthorizedActivationMatch
-): SecretLeaseResult<SecretLease> =>
-  event.atMs < lease.facts.authorizedAtMs || event.atMs >= lease.facts.expiresAtMs
-    ? secretLeaseErr({ code: 'lease-expired', message: 'The secret lease cannot be activated at this time.' })
-    : secretLeaseOk({
-        state: 'active',
-        facts: lease.facts,
-        activatedAtMs: event.atMs
-      });
+const requireExposureRecovery = (
+  lease: ExposedSecretLease,
+  event: Extract<SecretLeaseEvent, { type: 'require-recovery' }>
+): SecretLeaseResult<SecretLease> => validEventTime(lease, event.atMs) && event.atMs >= lease.acknowledgedAtMs
+  ? secretLeaseOk({
+      state: 'recovery-required',
+      facts: lease.facts,
+      deliveryStartedAtMs: lease.deliveryStartedAtMs,
+      acknowledgedAtMs: lease.acknowledgedAtMs,
+      recoveryRequiredAtMs: event.atMs,
+      phase: 'exposure',
+      reason: event.reason
+    })
+  : invalidTransition();
 
-const completeActiveLease = (
-  { lease, event }: ActiveCompletionMatch
-): SecretLeaseResult<SecretLease> =>
-  event.atMs < lease.activatedAtMs || event.atMs >= lease.facts.expiresAtMs
-    ? secretLeaseOk({
-        state: 'revoked',
-        facts: lease.facts,
-        revokedAtMs: event.atMs,
-        reason: 'lease-expired'
-      })
-    : secretLeaseOk({
-        state: 'consumed',
-        facts: lease.facts,
-        activatedAtMs: lease.activatedAtMs,
-        completedAtMs: event.atMs
-      });
+const requestExposureClosure = (
+  lease: ExposedSecretLease,
+  event: Extract<SecretLeaseEvent, { type: 'request-closure' }>
+): SecretLeaseResult<SecretLease> => validEventTime(lease, event.atMs) && event.atMs >= lease.acknowledgedAtMs &&
+  (event.reason !== 'lease-expired' || event.atMs >= lease.facts.expiresAtMs)
+  ? secretLeaseOk({
+      state: 'closure-required',
+      facts: lease.facts,
+      deliveryStartedAtMs: lease.deliveryStartedAtMs,
+      acknowledgedAtMs: lease.acknowledgedAtMs,
+      closureRequiredAtMs: event.atMs,
+      reason: event.reason
+    })
+  : invalidTransition();
 
-const expireAuthorizedLease = ({ lease, event }: AuthorizedExpirationMatch): SecretLeaseResult<SecretLease> =>
-  revoke(lease, event);
+const escalateRecoveryToClosure = (
+  lease: RecoveryRequiredSecretLease,
+  event: Extract<SecretLeaseEvent, { type: 'request-closure' }>
+): SecretLeaseResult<SecretLease> => lease.deliveryStartedAtMs !== null && lease.acknowledgedAtMs !== null &&
+  validEventTime(lease, event.atMs) && event.atMs >= lease.recoveryRequiredAtMs
+  ? secretLeaseOk({
+      state: 'closure-required',
+      facts: lease.facts,
+      deliveryStartedAtMs: lease.deliveryStartedAtMs,
+      acknowledgedAtMs: lease.acknowledgedAtMs,
+      closureRequiredAtMs: event.atMs,
+      reason: event.reason
+    })
+  : invalidTransition();
 
-const revokeAuthorizedLease = ({ lease, event }: AuthorizedRevocationMatch): SecretLeaseResult<SecretLease> =>
-  revoke(lease, event);
-
-const expireActiveLease = ({ lease, event }: ActiveExpirationMatch): SecretLeaseResult<SecretLease> =>
-  revoke(lease, event);
-
-const revokeActiveLease = ({ lease, event }: ActiveRevocationMatch): SecretLeaseResult<SecretLease> =>
-  revoke(lease, event);
+const closeExposure = (
+  lease: ClosureRequiredSecretLease | RecoveryRequiredSecretLease,
+  event: Extract<SecretLeaseEvent, { type: 'close' }>
+): SecretLeaseResult<SecretLease> => cleanupReceiptMatches(lease, event)
+  ? secretLeaseOk({
+      state: 'closed',
+      facts: lease.facts,
+      closedAtMs: event.atMs,
+      cleanupReceipt: event.receipt
+    })
+  : secretLeaseErr({
+      code: 'lease-transition-invalid',
+      message: 'Secret exposure cannot close without an exact matching tree-cleanup receipt.'
+    });
 
 export const reduceSecretLease = (
   lease: SecretLease,
   event: SecretLeaseEvent
 ): SecretLeaseResult<SecretLease> =>
   match<Readonly<{ lease: SecretLease; event: SecretLeaseEvent }>, SecretLeaseResult<SecretLease>>({ lease, event })
-    .with(
-      { lease: { state: 'authorized' }, event: { type: 'activate' } },
-      activateAuthorizedLease
-    )
-    .with(
-      { lease: { state: 'active' }, event: { type: 'complete' } },
-      completeActiveLease
-    )
-    .with(
-      { lease: { state: 'authorized' }, event: { type: 'expire' } },
-      expireAuthorizedLease
-    )
-    .with(
-      { lease: { state: 'authorized' }, event: { type: 'revoke' } },
-      revokeAuthorizedLease
-    )
-    .with(
-      { lease: { state: 'active' }, event: { type: 'expire' } },
-      expireActiveLease
-    )
-    .with(
-      { lease: { state: 'active' }, event: { type: 'revoke' } },
-      revokeActiveLease
-    )
-    .otherwise(() => secretLeaseErr({
-      code: 'lease-transition-invalid',
-      message: 'The secret lease transition is not permitted from its current state.'
-    }));
+    .with({ lease: { state: 'authorized' }, event: { type: 'begin-delivery' } }, ({ lease: target, event: next }) =>
+      beginDelivery(target, next))
+    .with({ lease: { state: 'authorized' }, event: { type: 'revoke-unexposed' } }, ({ lease: target, event: next }) =>
+      revokeUnexposed(target, next))
+    .with({ lease: { state: 'delivering' }, event: { type: 'acknowledge-exposure' } },
+      ({ lease: target, event: next }) => acknowledgeExposure(target, next))
+    .with({ lease: { state: 'delivering' }, event: { type: 'require-recovery' } },
+      ({ lease: target, event: next }) => requireDeliveryRecovery(target, next))
+    .with({ lease: { state: 'exposed' }, event: { type: 'request-closure' } },
+      ({ lease: target, event: next }) => requestExposureClosure(target, next))
+    .with({ lease: { state: 'exposed' }, event: { type: 'require-recovery' } },
+      ({ lease: target, event: next }) => requireExposureRecovery(target, next))
+    .with({ lease: { state: 'recovery-required' }, event: { type: 'request-closure' } },
+      ({ lease: target, event: next }) => escalateRecoveryToClosure(target, next))
+    .with({ lease: { state: 'closure-required' }, event: { type: 'close' } },
+      ({ lease: target, event: next }) => closeExposure(target, next))
+    .with({ lease: { state: 'recovery-required' }, event: { type: 'close' } },
+      ({ lease: target, event: next }) => closeExposure(target, next))
+    .otherwise(invalidTransition);

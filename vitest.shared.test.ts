@@ -63,6 +63,7 @@ describe('conservativeProjectTestConfig', () => {
     ['broker-client.test.ts', ['broker-client']],
     ['src/broker-client/client.test.ts', ['broker-client']],
     ['src/recipe-runner/runner.test.ts', ['recipe-runner']],
+    ['src/recipe-contract/xml.test.ts', ['recipe-runner']],
     ['src/broker/runtime.live.test.ts', ['live']],
     ['src/broker/bun-sqlite-journal.test.ts', ['bun-live']],
     ['broker.test.ts', ['broker']],

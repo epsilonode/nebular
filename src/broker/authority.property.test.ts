@@ -7,9 +7,11 @@ import {
   parseBrokerTimestampMs,
   type BrokerRequestMessage
 } from '../broker-client/public.ts';
+import { decodeAndAdmitRecipeXml, type AdmittedRecipe } from '../recipe-contract/public.ts';
 import {
   authorizeExecution,
   parseCanonicalRepository,
+  parseCredentialReference,
   parseCredentialSlotId,
   parseGrantId,
   parseRecipeRevision,
@@ -22,6 +24,18 @@ type AuthorityFixture = Readonly<{
   recipe: ResolvedRecipe;
   grant: BrokerGrant;
 }>;
+
+const admittedRecipe = (slotNames: readonly string[]): AdmittedRecipe | undefined => {
+  const slots = slotNames.map((name, index) => `<credential-slot id="${name}" provider="provider-${index}" environment="production" delivery="environment" inject="TOKEN_${index}">
+    <scope>alerts:read</scope>
+  </credential-slot>`).join('');
+  const decoded = decodeAndAdmitRecipeXml(`<recipe schema="wx.recipe/v1" id="property" receiver="pm2" lifecycle="one-shot">
+    <timeout ms="20000" />
+    <exec name="property-once" cwd="." tool="mise"><arg>run</arg><arg>property</arg></exec>
+    ${slots}
+  </recipe>`);
+  return decoded.isOk() ? decoded.value : undefined;
+};
 
 const buildFixture = (
   slotNames: readonly string[],
@@ -42,21 +56,35 @@ const buildFixture = (
     const parsed = parseCredentialSlotId(name);
     return parsed.isOk() ? [parsed.value] : [];
   });
+  const admitted = admittedRecipe(slotNames);
+  const credentialReferences = slotNames.flatMap((name, index) => {
+    const parsed = parseCredentialReference(`credential-${index}-${name}`);
+    return parsed.isOk() ? [parsed.value] : [];
+  });
   if (repository.isErr() || revision.isErr() || grantId.isErr() || requestId.isErr() ||
       sequence.isErr() || sentAtMs.isErr() || slots.length !== slotNames.length ||
-      requestedSlots.length !== requestedSlotNames.length) return undefined;
+      credentialReferences.length !== slotNames.length || requestedSlots.length !== requestedSlotNames.length ||
+      admitted === undefined || slots[0] === undefined || credentialReferences[0] === undefined) return undefined;
 
   const recipe: ResolvedRecipe = {
     repository: repository.value,
     relativePath: 'recipe.xml',
     revision: revision.value,
-    credentialSlotIds: slots
+    credentialSlotIds: slots,
+    admittedRecipe: admitted
   };
   const grant: BrokerGrant = {
     id: grantId.value,
+    generation: 1,
     repository: repository.value,
     recipeRevision: revision.value,
-    credentialSlotIds: slots,
+    credentialBindings: [{
+      slotId: slots[0],
+      credentialReference: credentialReferences[0]
+    }, ...slots.slice(1).flatMap((slot, index) => {
+      const credentialReference = credentialReferences[index + 1];
+      return credentialReference === undefined ? [] : [{ slotId: slot, credentialReference }];
+    })],
     expiresAtMs,
     revoked: false
   };
@@ -71,6 +99,7 @@ const buildFixture = (
       sentAtMs: sentAtMs.value,
       payload: {
         operation: 'execute-recipe',
+        grantIdHint: grantId.value,
         repositoryPathHint: repository.value,
         recipePathHint: recipe.relativePath,
         recipeRevision: revision.value,

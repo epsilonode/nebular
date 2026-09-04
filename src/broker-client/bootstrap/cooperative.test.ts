@@ -5,13 +5,17 @@ import {
   createBootstrapRequest,
   decodeBootstrapProtocolMessage,
   type BootstrapDeliveryMessage,
+  type BootstrapRejectionCode,
   type BootstrapRequestMessage,
   type BootstrapResponseMessage
 } from './protocol.ts';
 import {
   planBootstrapEnvironmentPatch,
   prepareRecipeEnvironment,
+  prepareRecipeEnvironmentThenImportWithRetry,
   prepareRecipeEnvironmentThenImport,
+  prepareRecipeEnvironmentWithRetry,
+  type BootstrapNotReadyRetryPort,
   type BootstrapEnvironmentInstallPort,
   type CooperativeBootstrapPorts,
   type CooperativeBootstrapTransportPort
@@ -56,6 +60,19 @@ const delivery = (
   });
   if (decoded.isErr() || decoded.value.messageKind !== 'bootstrap-delivery') {
     throw new Error('expected valid bootstrap delivery fixture');
+  }
+  return decoded.value;
+};
+
+const rejection = (code: BootstrapRejectionCode): BootstrapResponseMessage => {
+  const decoded = decodeBootstrapProtocolMessage({
+    protocolVersion: BROKER_BOOTSTRAP_PROTOCOL_VERSION,
+    messageKind: 'bootstrap-rejected',
+    exchangeId: 'bootstrap-1',
+    payload: { code }
+  });
+  if (decoded.isErr() || decoded.value.messageKind !== 'bootstrap-rejected') {
+    throw new Error('expected valid bootstrap rejection fixture');
   }
   return decoded.value;
 };
@@ -111,6 +128,26 @@ describe('cooperative bootstrap environment planning', () => {
       name: 'reserved runtime loader name',
       requested: request([{ slotId: 'weather-api', environmentName: 'NODE_OPTIONS' }]),
       delivered: delivery([{ slotId: 'weather-api', environmentName: 'NODE_OPTIONS', secret: 'secret' }]),
+      inherited: [],
+      nowMs: 1_000,
+      code: 'environment-invalid'
+    },
+    {
+      name: 'reserved broker authority name under Windows case folding',
+      requested: request([{ slotId: 'weather-api', environmentName: 'nebular_pm2_job_identity' }]),
+      delivered: delivery([{
+        slotId: 'weather-api',
+        environmentName: 'nebular_pm2_job_identity',
+        secret: 'secret'
+      }]),
+      inherited: [],
+      nowMs: 1_000,
+      code: 'environment-invalid'
+    },
+    {
+      name: 'reserved process search path',
+      requested: request([{ slotId: 'weather-api', environmentName: 'PATH' }]),
+      delivered: delivery([{ slotId: 'weather-api', environmentName: 'PATH', secret: 'secret' }]),
       inherited: [],
       nowMs: 1_000,
       code: 'environment-invalid'
@@ -294,6 +331,155 @@ describe('cooperative bootstrap composition', () => {
       })]
     }));
     expect(evaluated).toBe(false);
+  });
+
+  it('retries only transient not-ready responses and installs exactly once after receiver binding', async () => {
+    const responses: BootstrapResponseMessage[] = [
+      rejection('attempt-not-ready'),
+      rejection('attempt-not-ready'),
+      delivery()
+    ];
+    const waits: number[] = [];
+    let exchanges = 0;
+    let installs = 0;
+    const base = successPorts(delivery());
+    const ports: CooperativeBootstrapPorts = {
+      ...base,
+      transport: {
+        exchange: (_request, consume) => {
+          const response = responses[exchanges];
+          exchanges += 1;
+          return response === undefined
+            ? Promise.resolve(clientErr({ code: 'transport-unavailable', message: 'fixture exhausted' }))
+            : consume(response);
+        }
+      },
+      environment: {
+        installAtomically: patch => {
+          installs += 1;
+          return base.environment.installAtomically(patch);
+        }
+      }
+    };
+    const retry: BootstrapNotReadyRetryPort = {
+      wait: delayMs => {
+        waits.push(delayMs);
+        return Promise.resolve();
+      }
+    };
+
+    const prepared = await prepareRecipeEnvironmentWithRetry({
+      request: request(),
+      inheritedEnvironmentNames: []
+    }, ports, retry, { maximumAttempts: 3, delayMs: 25 });
+
+    expect(prepared.isOk()).toBe(true);
+    expect(exchanges).toBe(3);
+    expect(waits).toEqual([25, 25]);
+    expect(installs).toBe(1);
+  });
+
+  it('bounds not-ready retries and never retries a terminal authority denial', async () => {
+    const observed: string[] = [];
+    const retry: BootstrapNotReadyRetryPort = {
+      wait: () => {
+        observed.push('wait');
+        return Promise.resolve();
+      }
+    };
+    const portsFor = (response: BootstrapResponseMessage): CooperativeBootstrapPorts => ({
+      ...successPorts(response),
+      transport: {
+        exchange: (_request, consume) => {
+          observed.push('exchange');
+          return consume(response);
+        }
+      }
+    });
+
+    const exhausted = await prepareRecipeEnvironmentWithRetry({
+      request: request(),
+      inheritedEnvironmentNames: []
+    }, portsFor(rejection('attempt-not-ready')), retry, { maximumAttempts: 2, delayMs: 10 });
+    expect(exhausted).toEqual(expect.objectContaining({
+      error: [expect.objectContaining({ code: 'bootstrap-not-ready' })]
+    }));
+    expect(observed).toEqual(['exchange', 'wait', 'exchange']);
+
+    observed.splice(0);
+    const denied = await prepareRecipeEnvironmentWithRetry({
+      request: request(),
+      inheritedEnvironmentNames: []
+    }, portsFor(rejection('grant-revoked')), retry, { maximumAttempts: 3, delayMs: 10 });
+    expect(denied).toEqual(expect.objectContaining({
+      error: [expect.objectContaining({ code: 'bootstrap-rejected' })]
+    }));
+    expect(observed).toEqual(['exchange']);
+  });
+
+  it('rejects an invalid retry policy before transport and defers import through successful retry', async () => {
+    let exchanges = 0;
+    let evaluated = false;
+    const responses: BootstrapResponseMessage[] = [rejection('attempt-not-ready'), delivery()];
+    const base = successPorts(delivery());
+    const ports: CooperativeBootstrapPorts = {
+      ...base,
+      transport: {
+        exchange: (_request, consume) => {
+          const response = responses[exchanges];
+          exchanges += 1;
+          return response === undefined
+            ? Promise.resolve(clientErr({ code: 'transport-unavailable', message: 'fixture exhausted' }))
+            : consume(response);
+        }
+      }
+    };
+    const retry: BootstrapNotReadyRetryPort = { wait: () => Promise.resolve() };
+    const invalid = await prepareRecipeEnvironmentWithRetry({
+      request: request(),
+      inheritedEnvironmentNames: []
+    }, ports, retry, { maximumAttempts: 0, delayMs: 10 });
+    expect(invalid).toEqual(expect.objectContaining({
+      error: [expect.objectContaining({ code: 'invalid-input' })]
+    }));
+    expect(exchanges).toBe(0);
+
+    const loaded = await prepareRecipeEnvironmentThenImportWithRetry({
+      request: request(),
+      inheritedEnvironmentNames: []
+    }, ports, retry, { maximumAttempts: 2, delayMs: 10 }, () => {
+      evaluated = true;
+      return Promise.resolve({ ready: true as const });
+    });
+    expect(loaded.isOk()).toBe(true);
+    expect(exchanges).toBe(2);
+    expect(evaluated).toBe(true);
+  });
+
+  it('redacts a failed retry scheduler and performs no further exchange', async () => {
+    let exchanges = 0;
+    const response = rejection('attempt-not-ready');
+    const ports: CooperativeBootstrapPorts = {
+      ...successPorts(response),
+      transport: {
+        exchange: (_request, consume) => {
+          exchanges += 1;
+          return consume(response);
+        }
+      }
+    };
+    const result = await prepareRecipeEnvironmentWithRetry({
+      request: request(),
+      inheritedEnvironmentNames: []
+    }, ports, {
+      wait: () => Promise.reject(new Error('private scheduler diagnostic'))
+    }, { maximumAttempts: 3, delayMs: 10 });
+
+    expect(result).toEqual(expect.objectContaining({
+      error: [expect.objectContaining({ code: 'transport-unavailable' })]
+    }));
+    expect(JSON.stringify(result)).not.toContain('private scheduler diagnostic');
+    expect(exchanges).toBe(1);
   });
 
   it('rolls back an installed environment when deferred application import fails', async () => {

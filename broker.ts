@@ -7,7 +7,12 @@ import {
   brokerIpcChildRequestId,
   brokerErr,
   brokerOk,
+  createWindowsBrokerAdminCliRuntime,
   createBunInheritedIpcChildRuntime,
+  createWindowsPm2OneShotBrokerOperationPort,
+  resolveWindowsBrokerBootstrapChildPorts,
+  runBrokerAdminCli,
+  runBrokerBootstrapInheritedIpcChild,
   runBrokerInheritedIpcChild,
   type BrokerRequestId,
   type BrokerResult
@@ -53,13 +58,39 @@ export const parseBrokerEntrypointChildMode = (
 
 if (import.meta.main) {
   const childMode = parseBrokerEntrypointChildMode(Bun.argv);
-  if (childMode.isErr() || childMode.value.mode === 'none') process.exit(64);
-  // The production durable authority/receiver adapters are not admitted yet.
-  // Recognize bootstrap invocations but fail before opening a doomed handshake.
-  if (childMode.value.mode === 'bootstrap') process.exit(78);
+  if (childMode.isErr()) process.exit(64);
+  if (childMode.value.mode === 'none') {
+    const receipt = await runBrokerAdminCli(
+      Bun.argv.slice(2),
+      createWindowsBrokerAdminCliRuntime()
+    );
+    if (receipt.isErr()) {
+      console.error(JSON.stringify({ outcome: 'failure', code: receipt.error[0].code }));
+      process.exit(receipt.error[0].code === 'request-invalid' ? 64 : 1);
+    }
+    console.log(JSON.stringify(receipt.value));
+    process.exit(0);
+  }
+  if (childMode.value.mode === 'bootstrap') {
+    const ports = await resolveWindowsBrokerBootstrapChildPorts();
+    if (ports.isErr()) process.exit(78);
+    const served = await runBrokerBootstrapInheritedIpcChild(
+      { exchangeId: childMode.value.exchangeId },
+      ports.value
+    );
+    process.exit(served.isOk() ? 0 : 1);
+  }
   const served = await runBrokerInheritedIpcChild(
     { requestId: childMode.value.requestId },
-    createBunInheritedIpcChildRuntime()
+    createBunInheritedIpcChildRuntime(),
+    createWindowsPm2OneShotBrokerOperationPort({
+      composition: {
+        oneShot: {
+          brokerEntrypointPath: Bun.main
+        }
+      },
+      doctorTimeoutMs: 2_000
+    })
   );
   process.exit(served.isOk() ? 0 : 1);
 }

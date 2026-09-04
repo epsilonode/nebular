@@ -25,6 +25,7 @@ const requestMessage = (): BrokerRequestMessage => {
     sentAtMs: sentAtMs.value,
     payload: {
       operation: 'execute-recipe',
+      grantIdHint: 'grant-1',
       repositoryPathHint: 'R:/Code/example',
       recipePathHint: 'recipe.xml',
       recipeRevision: 'revision-1',
@@ -46,6 +47,37 @@ describe('broker control codec', () => {
   it('rejects unknown and secret-bearing fields', () => {
     expect(decodeBrokerControlMessage({ ...requestMessage(), secret: 'must-not-cross-control-ipc' }).isErr()).toBe(true);
     expect(decodeBrokerControlMessage({ ...requestMessage(), protocolVersion: 2 }).isErr()).toBe(true);
+  });
+
+  it('requires a bounded grant selector only for execute requests', () => {
+    const executeWithoutGrant = {
+      ...requestMessage(),
+      payload: {
+        operation: 'execute-recipe',
+        credentialSlotIds: []
+      }
+    };
+    expect(decodeBrokerControlMessage(executeWithoutGrant).isErr()).toBe(true);
+    expect(decodeBrokerControlMessage({
+      ...requestMessage(),
+      payload: {
+        operation: 'execute-recipe',
+        grantIdHint: 'x'.repeat(129),
+        credentialSlotIds: []
+      }
+    }).isErr()).toBe(true);
+    expect(decodeBrokerControlMessage({
+      ...requestMessage(),
+      payload: {
+        operation: 'doctor',
+        grantIdHint: 'grant-1',
+        credentialSlotIds: []
+      }
+    }).isErr()).toBe(true);
+    expect(decodeBrokerControlMessage({
+      ...requestMessage(),
+      payload: { operation: 'doctor', credentialSlotIds: [] }
+    }).isOk()).toBe(true);
   });
 
   it('rejects oversized JSON before parsing', () => {

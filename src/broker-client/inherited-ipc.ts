@@ -3,6 +3,7 @@ import { ResultAsync } from 'neverthrow';
 import {
   BROKER_PROTOCOL_VERSION,
   decodeBrokerControlMessage,
+  type BrokerCancelMessage,
   type BrokerControlMessage,
   type BrokerRequestMessage,
   type BrokerRequestPayload
@@ -31,12 +32,16 @@ import {
 export const BROKER_IPC_CHILD_ARGUMENT = '--nebular-ipc-child' as const;
 export const BROKER_DEFAULT_OPERATION_TIMEOUT_MS = 30_000;
 export const BROKER_MAX_OPERATION_TIMEOUT_MS = 5 * 60_000;
+export const BROKER_DEFAULT_CLEANUP_GRACE_MS = 5_000;
+export const BROKER_MAX_CLEANUP_GRACE_MS = 60_000;
+export const BROKER_INHERITED_IPC_GENERATION = 0;
 
 export type BrokerInheritedIpcRequest = Readonly<{
   brokerEntrypoint: string;
   cwd: string;
   payload: BrokerRequestPayload;
   timeoutMs?: number;
+  cleanupGraceMs?: number;
 }>;
 
 export type BrokerInheritedIpcReceipt = Readonly<{
@@ -80,6 +85,14 @@ const operationTimeout = (value: number | undefined): BrokerClientResult<number>
     : clientErr({ code: 'invalid-input', message: 'Broker operation timeout is invalid.' });
 };
 
+const cleanupGrace = (value: number | undefined): BrokerClientResult<number> => {
+  const cleanupGraceMs = value ?? BROKER_DEFAULT_CLEANUP_GRACE_MS;
+  return Number.isSafeInteger(cleanupGraceMs) && cleanupGraceMs > 0 &&
+    cleanupGraceMs <= BROKER_MAX_CLEANUP_GRACE_MS
+    ? clientOk(cleanupGraceMs)
+    : clientErr({ code: 'invalid-input', message: 'Broker cleanup grace is invalid.' });
+};
+
 const requestMessage = (
   exchange: Extract<BrokerClientExchange, { state: 'ready' }>,
   payload: BrokerRequestPayload,
@@ -97,6 +110,22 @@ const requestMessage = (
       ? clientOk(message)
       : clientErr({ code: 'protocol-mismatch', message: 'Broker request projection produced the wrong message kind.' }))
   );
+
+const cancelMessage = (
+  exchange: Extract<BrokerClientExchange, { state: 'active' }>,
+  nowMs: number
+): BrokerClientResult<BrokerCancelMessage> => parseBrokerTimestampMs(nowMs).andThen(sentAtMs =>
+  decodeBrokerControlMessage({
+    protocolVersion: BROKER_PROTOCOL_VERSION,
+    messageKind: 'cancel',
+    requestId: exchange.requestId,
+    sequence: exchange.nextSequence,
+    sentAtMs,
+    payload: { expectedGeneration: BROKER_INHERITED_IPC_GENERATION }
+  }).andThen(message => message.messageKind === 'cancel'
+    ? clientOk(message)
+    : clientErr({ code: 'protocol-mismatch', message: 'Broker cancel projection produced the wrong message kind.' }))
+);
 
 type ActiveExchange = Readonly<{
   exchange: BrokerClientExchange;
@@ -126,17 +155,24 @@ const executeExchange = (
   input: BrokerInheritedIpcRequest,
   runtime: BrokerInheritedIpcRuntime,
   timeoutMs: number,
+  cleanupGraceMs: number,
   requestId: BrokerRequestId,
   initial: BrokerClientExchange
 ): Promise<BrokerClientResult<BrokerInheritedIpcReceipt>> => new Promise(resolve => {
   let state: ActiveExchange = { exchange: initial, disconnected: false };
   let settled = false;
+  let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
   const peerCell: { current?: BrokerIpcPeer } = {};
+
+  const clearTimers = (): void => {
+    clearTimeout(operationTimer);
+    if (cleanupTimer !== undefined) clearTimeout(cleanupTimer);
+  };
 
   const settle = (result: BrokerClientResult<BrokerInheritedIpcReceipt>): void => {
     if (settled) return;
     settled = true;
-    clearTimeout(timer);
+    clearTimers();
     resolve(result);
   };
 
@@ -147,6 +183,17 @@ const executeExchange = (
   const fail = (issues: BrokerClientIssues): void => {
     peerCell.current?.terminate();
     settle(clientErr(...issues));
+  };
+
+  const beginCleanupGrace = (): void => {
+    if (settled || cleanupTimer !== undefined) return;
+    cleanupTimer = setTimeout(() => {
+      peerCell.current?.terminate();
+      settle(clientErr({
+        code: 'transport-unavailable',
+        message: 'Broker IPC cancellation cleanup exceeded its bounded grace.'
+      }));
+    }, cleanupGraceMs);
   };
 
   const advance = (message: BrokerControlMessage): BrokerClientResult<BrokerClientExchange> =>
@@ -168,6 +215,25 @@ const executeExchange = (
     state = { ...state, exchange: active.value };
     const sent = target.send(prepared.value);
     if (sent.isErr()) return fail(sent.error);
+  };
+
+  const requestCancellation = (active: Extract<BrokerClientExchange, { state: 'active' }>): void => {
+    const prepared = cancelMessage(active, runtime.nowMs());
+    if (prepared.isErr()) return fail(prepared.error);
+    const cancelling = reduceBrokerClientExchange(active, {
+      eventKind: 'control',
+      direction: 'client-to-broker',
+      message: prepared.value
+    });
+    if (cancelling.isErr()) return fail(cancelling.error);
+    state = { ...state, exchange: cancelling.value };
+    const sent = peerCell.current?.send(prepared.value);
+    if (sent === undefined) {
+      fail([{ code: 'transport-unavailable', message: 'Broker IPC helper was unavailable for cancellation.' }]);
+      return;
+    }
+    if (sent.isErr()) return fail(sent.error);
+    beginCleanupGrace();
   };
 
   const observer: BrokerIpcObserver = {
@@ -205,9 +271,20 @@ const executeExchange = (
     }
   };
 
-  const timer = setTimeout(() => {
-    peerCell.current?.terminate();
-    settle(clientErr({ code: 'transport-unavailable', message: 'Broker IPC operation exceeded its bounded deadline.' }));
+  const operationTimer = setTimeout(() => {
+    if (settled) return;
+    if (state.exchange.state === 'active') {
+      requestCancellation(state.exchange);
+      return;
+    }
+    if (state.exchange.state === 'cancellation-requested' || state.exchange.state === 'terminal') {
+      beginCleanupGrace();
+      return;
+    }
+    fail([{
+      code: 'transport-unavailable',
+      message: 'Broker IPC operation exceeded its bounded deadline before activation.'
+    }]);
   }, timeoutMs);
 
   const spawned = runtime.spawn({ brokerEntrypoint: input.brokerEntrypoint, cwd: input.cwd, requestId }, observer);
@@ -228,12 +305,27 @@ export const runBrokerControlOverInheritedIpc = (
       message: 'Broker entrypoint or working directory is invalid.'
     }))).andThen(result => result);
   }
-  const prepared = operationTimeout(input.timeoutMs)
-    .andThen(timeoutMs => parseBrokerRequestId(runtime.newRequestId()).map(requestId => ({ timeoutMs, requestId })))
-    .andThen(({ timeoutMs, requestId }) => openBrokerClientExchange(requestId).map(initial => ({ timeoutMs, requestId, initial })));
+  const prepared = operationTimeout(input.timeoutMs).andThen(timeoutMs => cleanupGrace(input.cleanupGraceMs)
+    .andThen(cleanupGraceMs => parseBrokerRequestId(runtime.newRequestId()).map(requestId => ({
+      timeoutMs,
+      cleanupGraceMs,
+      requestId
+    })))).andThen(({ timeoutMs, cleanupGraceMs, requestId }) => openBrokerClientExchange(requestId).map(initial => ({
+      timeoutMs,
+      cleanupGraceMs,
+      requestId,
+      initial
+    })));
   return prepared.isErr()
     ? ResultAsync.fromSafePromise(Promise.resolve(clientErr(...prepared.error))).andThen(result => result)
-    : ResultAsync.fromSafePromise(executeExchange(input, runtime, prepared.value.timeoutMs, prepared.value.requestId, prepared.value.initial))
+    : ResultAsync.fromSafePromise(executeExchange(
+        input,
+        runtime,
+        prepared.value.timeoutMs,
+        prepared.value.cleanupGraceMs,
+        prepared.value.requestId,
+        prepared.value.initial
+      ))
       .andThen(result => result);
 };
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   authorizeSecretLease,
   parseCredentialReference,
+  parseSecretExposureCorrelation,
   parseSecretLeaseId,
   secretLeaseErr,
   secretLeaseOk,
@@ -59,10 +60,11 @@ const typedLeaseFixture = (): AuthorizedSecretLease => {
   const slotId = parseCredentialSlotId('weather-api');
   const reference = parseCredentialReference('credential-1');
   const leaseId = parseSecretLeaseId('lease-1');
+  const exposureCorrelation = parseSecretExposureCorrelation('exposure-1');
   const receiverId = parseReceiverId('pm2');
   const processAttemptId = parseProcessAttemptId('attempt-1');
   if (repository.isErr() || revision.isErr() || grantId.isErr() || slotId.isErr() || reference.isErr() ||
-      leaseId.isErr() || receiverId.isErr() || processAttemptId.isErr()) {
+      leaseId.isErr() || exposureCorrelation.isErr() || receiverId.isErr() || processAttemptId.isErr()) {
     throw new Error('typed grant-to-bootstrap fixture construction failed');
   }
   const binding: SecretSlotBinding = {
@@ -88,6 +90,7 @@ const typedLeaseFixture = (): AuthorizedSecretLease => {
     recipeRevision: revision.value,
     receiverId: receiverId.value,
     processAttemptId: processAttemptId.value,
+    exposureCorrelation: exposureCorrelation.value,
     bindings: [binding],
     requestedAtMs: 1_000,
     expiresAtMs: 1_500,
@@ -155,7 +158,8 @@ const createSecretDeliveryFake = (
             leaseId: context.leaseId,
             processAttemptId: context.processAttemptId,
             installedSlotIds,
-            secretsCleared: true as const
+            environmentInstalled: true as const,
+            brokerCopiesReleased: true as const
           });
       }).orElse(issues => {
         staged.clear();
@@ -188,10 +192,11 @@ describe('grant to bootstrap secret delivery seam', () => {
 
     expect(result).toEqual(expect.objectContaining({
       value: expect.objectContaining({
-        outcome: 'completed',
+        outcome: 'exposed',
         deliveredSlotIds: ['weather-api'],
-        secretsCleared: true,
-        lease: expect.objectContaining({ state: 'consumed' })
+        environmentInstalled: true,
+        brokerCopiesReleased: true,
+        lease: expect.objectContaining({ state: 'exposed' })
       })
     }));
     expect(inspection.secretObservedOnlyInsideBootstrap).toBe(true);
@@ -206,7 +211,7 @@ describe('grant to bootstrap secret delivery seam', () => {
     expect(JSON.stringify({ result, inspection })).not.toContain(canary);
   });
 
-  it('revokes the lease and clears bootstrap staging when the store cannot acquire a secret', async () => {
+  it('requires recovery and clears bootstrap staging when delivery becomes ambiguous', async () => {
     const canary = 'SECRET_CANARY_NEVER_ACQUIRED';
     const fake = createSecretDeliveryFake(canary, 'secret-unavailable');
     const result = await deliverAuthorizedSecretLease(typedLeaseFixture(), fake.ports);
@@ -214,11 +219,10 @@ describe('grant to bootstrap secret delivery seam', () => {
 
     expect(result).toEqual(expect.objectContaining({
       value: expect.objectContaining({
-        outcome: 'revoked',
-        reason: 'secret-unavailable',
-        secretsCleared: true,
+        outcome: 'recovery-required',
+        brokerCopiesReleased: true,
         issueCodes: ['secret-unavailable'],
-        lease: expect.objectContaining({ state: 'revoked' })
+        lease: expect.objectContaining({ state: 'recovery-required' })
       })
     }));
     expect(inspection.events).toEqual([
@@ -237,9 +241,8 @@ describe('grant to bootstrap secret delivery seam', () => {
 
     expect(result).toEqual(expect.objectContaining({
       value: expect.objectContaining({
-        outcome: 'revoked',
-        reason: 'bootstrap-rejected',
-        secretsCleared: true,
+        outcome: 'recovery-required',
+        brokerCopiesReleased: true,
         issueCodes: ['bootstrap-rejected']
       })
     }));

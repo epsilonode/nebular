@@ -1,21 +1,24 @@
 import {
   createBunSecretStoreAdminPort,
   createBunSecretStoreLeasePort,
-  createSecretInput
+  disposeSecretInputScope,
+  openSecretInputScope
 } from '../../src/broker/bun-secret-store.ts';
 import { parseCredentialReference, secretLeaseOk } from '../../src/broker/lease.ts';
 import { parseCredentialSlotId } from '../../src/broker/primitives.ts';
 
 const reference = parseCredentialReference(`live-${crypto.randomUUID()}`);
 const slotId = parseCredentialSlotId('live-slot');
-const input = createSecretInput(`nebular-live-${crypto.randomUUID()}`);
+const inputScope = openSecretInputScope();
+const input = inputScope.capture.capture(`nebular-live-${crypto.randomUUID()}`);
 if (reference.isErr() || slotId.isErr() || input.isErr()) {
   throw new Error('Live keychain fixture construction failed.');
 }
 
 const admin = createBunSecretStoreAdminPort();
 const reader = createBunSecretStoreLeasePort();
-const stored = await admin.store(reference.value, input.value);
+const stored = await admin.store(reference.value, input.value, inputScope.nonce);
+disposeSecretInputScope(inputScope);
 if (stored.isErr()) throw new Error(`Live keychain store failed: ${stored.error[0].code}.`);
 
 try {

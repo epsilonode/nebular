@@ -223,12 +223,28 @@ const terminalObservation = (
   receiverId: admitted.receiver.id,
   state,
   sequence: snapshot.sequence,
-  healthy: state === 'succeeded' || state === 'stopped',
+  healthy: state === 'succeeded' || (state === 'stopped' &&
+    (snapshot.cleanup === 'complete' || snapshot.cleanup === 'not-required')),
   progressing: false,
   cleanup: snapshot.cleanup,
-  nextActions: snapshot.cleanup === 'partial'
+  nextActions: state === 'orphaned' || state === 'recovery-required' ||
+    snapshot.cleanup === 'pending' || snapshot.cleanup === 'partial'
     ? [{ action: 'reconcile', attemptId: snapshot.attemptId }]
     : [{ action: 'none' }]
+});
+
+const timedOutObservation = (
+  admitted: AdmittedProcessPlan,
+  snapshot: ReceiverSnapshot
+): ProcessObservation => ({
+  attemptId: snapshot.attemptId,
+  receiverId: admitted.receiver.id,
+  state: 'timed-out',
+  sequence: snapshot.sequence,
+  healthy: false,
+  progressing: false,
+  cleanup: snapshot.cleanup,
+  nextActions: [{ action: 'cancel', attemptId: snapshot.attemptId }]
 });
 
 const activeObservation = (
@@ -284,22 +300,27 @@ export const observeProcess = (
   if (snapshot.backendState === 'missing') return brokerOk(terminalObservation(admitted, snapshot, 'orphaned'));
   if (snapshot.backendState === 'errored') return brokerOk(terminalObservation(admitted, snapshot, 'failed'));
   if (snapshot.backendState === 'stopped') {
-    return brokerOk(terminalObservation(admitted, snapshot, snapshot.exitCode === 0 ? 'succeeded' : 'stopped'));
+    const clean = snapshot.cleanup === 'complete' || snapshot.cleanup === 'not-required';
+    return brokerOk(terminalObservation(
+      admitted,
+      snapshot,
+      snapshot.exitCode === 0 && clean ? 'succeeded' : 'stopped'
+    ));
   }
   if (snapshot.backendState === 'stopping') return brokerOk(activeObservation(admitted, snapshot, 'stopping', false));
   const startedAtMs = snapshot.startedAtMs;
   if (startedAtMs === undefined) {
     return nowMs >= admitted.plan.plannedAtMs + admitted.plan.policy.startupDeadlineMs
-      ? brokerOk(terminalObservation(admitted, snapshot, 'timed-out'))
+      ? brokerOk(timedOutObservation(admitted, snapshot))
       : brokerOk(activeObservation(admitted, snapshot, snapshot.backendState === 'materialized' ? 'materializing' : 'starting', true));
   }
   const hardDeadline = admitted.plan.policy.hardRuntimeDeadlineMs;
   if (hardDeadline !== undefined && nowMs >= startedAtMs + hardDeadline) {
-    return brokerOk(terminalObservation(admitted, snapshot, 'timed-out'));
+    return brokerOk(timedOutObservation(admitted, snapshot));
   }
   const readiness = admitted.plan.policy.readiness;
   if (readiness.mode === 'receiver-fact' && snapshot.readyAtMs === undefined && nowMs >= startedAtMs + readiness.deadlineMs) {
-    return brokerOk(terminalObservation(admitted, snapshot, 'timed-out'));
+    return brokerOk(timedOutObservation(admitted, snapshot));
   }
   return brokerOk(progressState(admitted, snapshot, nowMs));
 };

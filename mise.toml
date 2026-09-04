@@ -24,6 +24,33 @@ description = "Run opt-in host, keychain, PM2, IPC, and platform conformance"
 depends = ["build"]
 run = "bun run test:live"
 
+[tasks.test-live-pm2]
+description = "Run the Windows PM2 read-only AMP methods/version compatibility proof"
+run = "bun run test:live:pm2"
+
+[tasks.test-live-pm2-receiver]
+description = "Run the opt-in Windows PM2 exact-name one-shot lifecycle proof"
+run = "bun run test:live:pm2-receiver"
+
+[tasks.test-live-bootstrap-denial]
+description = "Prove the production Windows bootstrap root rejects absent durable authority"
+run = "bun run test:live:bootstrap-denial"
+
+[tasks.test-live-windows-filesystem]
+description = "Opt in to the live canonical Windows filesystem and no-reparse proof"
+depends = ["build"]
+run = "bun run test:live:windows-filesystem"
+
+[tasks.test-live-broker-e2e-preflight]
+description = "Pack/install all four artifacts, commit and admit the isolated recipe, then prove cleanup"
+depends = ["build"]
+run = "bun run test:live:broker-e2e-preflight"
+
+[tasks.test-live-broker-e2e]
+description = "Run the isolated four-artifact credential broker E2E through PM2 and Windows"
+depends = ["build"]
+run = "bun run test:live:broker-e2e"
+
 [tasks.verify]
 description = "Run all Teleport package checks"
 run = "bun run verify"

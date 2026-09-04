@@ -69,8 +69,10 @@ const grantCommand = (): CommitGrantWithConsent => {
       operationId,
       repository,
       recipeRevision,
-      credentialReference: unwrapBroker(parseCredentialReference('weather-primary')),
-      credentialSlotIds: [credentialSlotId],
+      credentialBindings: [{
+        slotId: credentialSlotId,
+        credentialReference: unwrapBroker(parseCredentialReference('weather-primary'))
+      }],
       consentId,
       generation: 1,
       issuedAtMs: 500,

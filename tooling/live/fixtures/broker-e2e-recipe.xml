@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<recipe schema="wx.recipe/v1" id="nebular-broker-e2e" kind="entrypoint" receiver="pm2" lifecycle="one-shot">
+  <summary>Exercise the four Nebular deliverables through the production broker path.</summary>
+  <source tool="bun" />
+  <timeout ms="20000" />
+  <exec name="nebular-broker-e2e" cwd="." tool="bun">
+    <arg>broker-e2e-target.ts</arg>
+    <env name="E2E_EXPECTED_PROVIDER_SHA256" value="__E2E_EXPECTED_PROVIDER_SHA256__" />
+  </exec>
+  <credential-slot id="e2e-provider" provider="nebular-e2e" environment="development" delivery="environment" inject="E2E_PROVIDER_VALUE">
+    <operation>digest-proof</operation>
+  </credential-slot>
+</recipe>

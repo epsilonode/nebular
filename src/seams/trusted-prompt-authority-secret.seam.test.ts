@@ -25,7 +25,6 @@ import {
 } from '../broker/authority-lifecycle.ts';
 import {
   createBunSecretStoreAdminPort,
-  createSecretInput,
   type BunSecretsWritePort
 } from '../broker/bun-secret-store.ts';
 import {
@@ -44,6 +43,7 @@ import {
 import {
   runTrustedCredentialEnrollment,
   trustedPromptTaskErr,
+  type TrustedCredentialEnrollmentIdempotencyPort,
   type TrustedCredentialPromptPort
 } from '../broker/trusted-prompt.ts';
 
@@ -74,21 +74,24 @@ const requestState = <State extends AuthorityRequest['state']>(
 
 const proposal = (): AuthorityGrantProposal => {
   const operation = unwrapLifecycle(parseAuthorityAtom('forecast'));
+  const credentialBindings: AuthorityGrantProposal['credentialBindings'] = [{
+    credentialReference: unwrapBroker(parseCredentialReference('credential-weather-primary')),
+    credentialSlotIds: createCredentialSlotSet(unwrapBroker(parseCredentialSlotId('weather-api'))),
+    providerAuthority: {
+      provider: unwrapLifecycle(parseProviderId('weather')),
+      account: { type: 'unspecified' },
+      environment: unwrapLifecycle(parseProviderEnvironment('production')),
+      requirements: operationRequirements(createAuthorityAtomSet(operation))
+    }
+  }];
   return {
     grantId: unwrapBroker(parseGrantId('grant-1')),
     repository: unwrapBroker(parseCanonicalRepository('R:\\Code\\weather-app')),
     recipeRevision: unwrapBroker(parseRecipeRevision('sha256:recipe-v1')),
     recipeDisplayPath: unwrapLifecycle(parseRecipeDisplayPath('.pk/recipes/weather.xml')),
     requestingExecutable: unwrapLifecycle(parseRequestingExecutable('mise run weather')),
-    credentialReference: unwrapBroker(parseCredentialReference('credential-weather-primary')),
-    credentialSlotIds: createCredentialSlotSet(unwrapBroker(parseCredentialSlotId('weather-api'))),
+    credentialBindings,
     authorityDigest: unwrapJournal(parseRedactedAuthorityDigest('sha256:redacted-weather-authority')),
-    providerAuthority: {
-      provider: unwrapLifecycle(parseProviderId('weather')),
-      account: { type: 'unspecified' },
-      environment: unwrapLifecycle(parseProviderEnvironment('production')),
-      requirements: operationRequirements(createAuthorityAtomSet(operation))
-    },
     promptVersion: unwrapLifecycle(parseConsentPromptVersion('nebular-consent/v1')),
     consentPurpose: 'credential-enrollment',
     requestedGrantExpiresAt: instant(10_000),
@@ -114,8 +117,7 @@ const promptFixture = (): Readonly<{
   const policy = requestState(unwrapLifecycle(reduceAuthorityRequest(parsed, {
     type: 'policy-accepted',
     at: instant(300),
-    providerAuthority: requestProposal.providerAuthority,
-    credentialSlotIds: requestProposal.credentialSlotIds,
+    credentialBindings: requestProposal.credentialBindings,
     grantExpiresAt: instant(9_000)
   })), 'policy-accepted');
   const consent = unwrapLifecycle(reduceAuthorityRequest(policy, {
@@ -130,12 +132,30 @@ const promptFixture = (): Readonly<{
   return { state, effect };
 };
 
+const executeOnce: TrustedCredentialEnrollmentIdempotencyPort = {
+  runOnce: (_claim, execute) => execute().map(completion => ({ outcome: 'executed', completion }))
+};
+
+const runtimeSequence = (...times: readonly number[]) => {
+  let index = 0;
+  return {
+    nowMs: () => {
+      const time = times[Math.min(index, times.length - 1)];
+      index += 1;
+      if (time === undefined) throw new Error('clock fixture exhausted');
+      return time;
+    },
+    openDeadline: () => ({
+      elapsed: new Promise<void>(() => undefined),
+      cancel: () => undefined
+    })
+  };
+};
+
 describe('authority consent to trusted prompt and OS secret-store seam', () => {
   it('stores callback-scoped input before emitting the secret-free approval event', async () => {
     const secretCanary = 'trusted-prompt-secret-canary';
     const fixture = promptFixture();
-    const entered = createSecretInput(secretCanary);
-    if (entered.isErr()) throw new Error('secret input fixture failed');
     const writes: string[] = [];
     const keychain: BunSecretsWritePort = {
       set: options => {
@@ -145,22 +165,26 @@ describe('authority consent to trusted prompt and OS secret-store seam', () => {
       delete: () => Promise.resolve(false)
     };
     const prompt: TrustedCredentialPromptPort = {
-      withCredentialInput: (request, use) => {
+      withCredentialInput: (request, input, use) => {
         expect(request.hostRequirement).toBe('distinct-user-visible-broker-window');
         expect(JSON.stringify(request)).not.toContain(secretCanary);
-        return use(entered.value, instant(600)).map(value => ({
-          outcome: 'accepted',
-          acceptedAt: instant(600),
-          value
-        }));
+        const entered = input.capture(secretCanary);
+        if (entered.isErr()) return trustedPromptTaskErr({
+          code: 'prompt-input-invalid',
+          message: 'Credential input fixture failed.'
+        });
+        return use(entered.value).map(value => ({ outcome: 'accepted', value }));
       }
     };
     const completion = await runTrustedCredentialEnrollment(
       fixture.state,
       fixture.effect,
-      instant(500),
-      prompt,
-      createBunSecretStoreAdminPort(keychain)
+      {
+        runtime: runtimeSequence(500, 600, 601, 602),
+        prompt,
+        store: createBunSecretStoreAdminPort(keychain),
+        idempotency: executeOnce
+      }
     );
     expect(completion.isOk()).toBe(true);
     if (completion.isErr()) return;
@@ -191,9 +215,12 @@ describe('authority consent to trusted prompt and OS secret-store seam', () => {
     const completion = await runTrustedCredentialEnrollment(
       fixture.state,
       fixture.effect,
-      instant(500),
-      prompt,
-      createBunSecretStoreAdminPort(keychain)
+      {
+        runtime: runtimeSequence(500),
+        prompt,
+        store: createBunSecretStoreAdminPort(keychain),
+        idempotency: executeOnce
+      }
     );
     expect(completion.isErr()).toBe(true);
     if (completion.isErr()) expect(completion.error[0].code).toBe('prompt-unavailable');

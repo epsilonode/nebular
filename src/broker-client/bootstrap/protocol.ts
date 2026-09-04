@@ -90,6 +90,7 @@ export type BootstrapDeliveryMessage = BootstrapEnvelope<'bootstrap-delivery'> &
 
 export type BootstrapRejectionCode =
   | 'attempt-mismatch'
+  | 'attempt-not-ready'
   | 'authority-denied'
   | 'grant-expired'
   | 'grant-revoked'
@@ -433,6 +434,7 @@ const decodeDelivery = (value: UnknownRecord): BrokerClientResult<BootstrapDeliv
 
 const rejectionCodes: readonly BootstrapRejectionCode[] = [
   'attempt-mismatch',
+  'attempt-not-ready',
   'authority-denied',
   'grant-expired',
   'grant-revoked',

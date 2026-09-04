@@ -42,7 +42,11 @@ export const testProjectSpecs: readonly TestProjectSpec[] = [
   ...atomicProjectNames.map((name, index): TestProjectSpec => ({
     name,
     groupOrder: index + 1,
-    include: [`${name}.test.ts`, `src/${name}/**/*.test.ts`],
+    include: [
+      `${name}.test.ts`,
+      `src/${name}/**/*.test.ts`,
+      ...(name === 'recipe-runner' ? ['src/recipe-contract/**/*.test.ts'] : [])
+    ],
     exclude: atomicTestExcludes
   })),
   {
@@ -65,6 +69,7 @@ export const classifyTestFile = (filePath: string): readonly TestHarnessName[] =
   if (!normalized.endsWith('.test.ts')) return [];
   if (normalized.endsWith('.live.test.ts')) return ['live'];
   if (normalized.endsWith('.seam.test.ts')) return ['seam'];
+  if (normalized.startsWith('src/recipe-contract/')) return ['recipe-runner'];
   return atomicProjectNames.filter(name =>
     normalized === `${name}.test.ts` || normalized.startsWith(`src/${name}/`)
   );

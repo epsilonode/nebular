@@ -109,9 +109,36 @@ describe('receiver process algebra', () => {
 
     const timedOut = observeProcess(admitted, snapshot({ startedAtMs: 1_000 }), 61_000);
     expect(timedOut.isOk() && timedOut.value.state).toBe('timed-out');
+    expect(timedOut.isOk() && timedOut.value.nextActions).toEqual([
+      { action: 'cancel', attemptId }
+    ]);
 
     const recovery = observeProcess(admitted, snapshot({ backendState: 'stopped', cleanup: 'partial' }), 10_000);
     expect(recovery.isOk() && recovery.value.state).toBe('recovery-required');
+    expect(recovery.isOk() && recovery.value.nextActions).toEqual([
+      { action: 'reconcile', attemptId }
+    ]);
+  });
+
+  it('does not claim one-shot success until exact cleanup is complete', () => {
+    const pending = observeProcess(admitted, snapshot({
+      backendState: 'stopped',
+      cleanup: 'pending',
+      exitCode: 0
+    }), 10_000);
+    expect(pending.isOk() && pending.value.state).toBe('stopped');
+    expect(pending.isOk() && pending.value.healthy).toBe(false);
+    expect(pending.isOk() && pending.value.nextActions).toEqual([
+      { action: 'reconcile', attemptId }
+    ]);
+
+    const complete = observeProcess(admitted, snapshot({
+      backendState: 'stopped',
+      cleanup: 'complete',
+      exitCode: 0
+    }), 10_000);
+    expect(complete.isOk() && complete.value.state).toBe('succeeded');
+    expect(complete.isOk() && complete.value.nextActions).toEqual([{ action: 'none' }]);
   });
 
   it('reports a quiet exemption without calling the process healthy from PM2 online alone', () => {

@@ -35,7 +35,7 @@ if (exit.code !== 0 || stderr.trim().length > 0) {
 const parsed: unknown = JSON.parse(stdout);
 if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed) ||
     !('outcome' in parsed) || parsed.outcome !== 'success' ||
-    !('code' in parsed) || parsed.code !== 'broker-ready' ||
+    !('code' in parsed) || parsed.code !== 'pm2-compatible' ||
     !('helperExitCode' in parsed) || parsed.helperExitCode !== 0) {
   throw new Error('Recipe-runner doctor emitted an invalid redacted receipt.');
 }

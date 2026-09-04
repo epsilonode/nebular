@@ -107,6 +107,20 @@ describe('closed cooperative bootstrap protocol', () => {
     expect(JSON.stringify(acknowledged)).not.toContain('secret');
   });
 
+  it('admits the closed transient attempt-not-ready rejection without free-form detail', () => {
+    expect(decodeBootstrapProtocolMessage({
+      protocolVersion: BROKER_BOOTSTRAP_PROTOCOL_VERSION,
+      messageKind: 'bootstrap-rejected',
+      exchangeId: 'bootstrap-1',
+      payload: { code: 'attempt-not-ready' }
+    })).toEqual(expect.objectContaining({
+      value: expect.objectContaining({
+        messageKind: 'bootstrap-rejected',
+        payload: { code: 'attempt-not-ready' }
+      })
+    }));
+  });
+
   it('rejects extra fields and free-form failure detail', () => {
     const extraAuthority = {
       protocolVersion: BROKER_BOOTSTRAP_PROTOCOL_VERSION,

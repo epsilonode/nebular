@@ -12,6 +12,7 @@ import {
 export type BrokerClientIssueCode =
   | 'application-import-failed'
   | 'bootstrap-expired'
+  | 'bootstrap-not-ready'
   | 'bootstrap-rejected'
   | 'environment-invalid'
   | 'invalid-input'

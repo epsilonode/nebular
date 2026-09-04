@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   BROKER_PROTOCOL_VERSION,
   decodeBrokerControlMessage,
+  parseBrokerAttemptId,
   parseBrokerRequestId,
   parseBrokerTimestampMs,
   type BrokerCancelMessage,
   type BrokerRequestMessage
 } from '../broker-client/public.ts';
+import { decodeAndAdmitRecipeXml } from '../recipe-contract/public.ts';
 import {
   authorizeExecution,
   brokerErr,
@@ -17,6 +19,7 @@ import {
   handleBrokerControlInput,
   openBrokerControlSession,
   parseCanonicalRepository,
+  parseCredentialReference,
   parseCredentialSlotId,
   parseGrantId,
   parseRecipeRevision,
@@ -41,6 +44,7 @@ const requestMessage = (): BrokerRequestMessage => {
     sentAtMs: 1001,
     payload: {
       operation: 'execute-recipe',
+      grantIdHint: 'grant-1',
       repositoryPathHint: 'R:/Code/untrusted-alias',
       recipePathHint: 'recipe.xml',
       recipeRevision: 'revision-1',
@@ -65,20 +69,33 @@ const cancelMessage = (sequence: number, expectedGeneration = 0): BrokerCancelMe
 };
 
 const authorizedExecution = (request: BrokerRequestMessage): AuthorizedExecution => {
+  const admittedRecipe = decodeAndAdmitRecipeXml(`<recipe schema="wx.recipe/v1" id="weather" receiver="pm2" lifecycle="one-shot">
+    <timeout ms="20000" />
+    <exec name="weather-once" cwd="." tool="mise"><arg>run</arg><arg>weather</arg></exec>
+    <credential-slot id="weather-api" provider="weather" environment="production" delivery="environment" inject="WEATHER_TOKEN">
+      <scope>alerts:read</scope>
+    </credential-slot>
+  </recipe>`);
   const repository = unwrapBroker(parseCanonicalRepository('R:/Code/canonical'));
   const revision = unwrapBroker(parseRecipeRevision('revision-1'));
   const slot = unwrapBroker(parseCredentialSlotId('weather-api'));
   const grantId = unwrapBroker(parseGrantId('grant-1'));
+  const credentialReference = parseCredentialReference('credential-weather');
+  if (admittedRecipe.isErr() || credentialReference.isErr()) {
+    throw new Error('admitted recipe fixture construction failed');
+  }
   return unwrapBroker(authorizeExecution(request, {
     repository,
     relativePath: 'recipe.xml',
     revision,
-    credentialSlotIds: [slot]
+    credentialSlotIds: [slot],
+    admittedRecipe: admittedRecipe.value
   }, {
     id: grantId,
+    generation: 1,
     repository,
     recipeRevision: revision,
-    credentialSlotIds: [slot],
+    credentialBindings: [{ slotId: slot, credentialReference: credentialReference.value }],
     expiresAtMs: 2000,
     revoked: false
   }, 1000));
@@ -128,14 +145,20 @@ describe('privileged broker inherited-IPC control handler', () => {
     }));
     const completedAt = parseBrokerTimestampMs(1003);
     if (completedAt.isErr()) throw new Error('timestamp fixture is invalid');
+    const attemptId = parseBrokerAttemptId('attempt-control-1');
+    if (attemptId.isErr()) throw new Error('attempt fixture is invalid');
     const completed = unwrapBroker(completeBrokerControlSession(
       admitted.session,
-      { outcome: 'success', code: 'completed', message: 'Execution completed.' },
+      { outcome: 'success', code: 'completed', message: 'Execution completed.', attemptId: attemptId.value },
       completedAt.value
     ));
     expect(completed).toEqual(expect.objectContaining({
       session: expect.objectContaining({ state: 'terminal', terminal: { outcome: 'success', code: 'completed' } }),
-      outbound: [expect.objectContaining({ messageKind: 'terminal-success', sequence: 3 })]
+      outbound: [expect.objectContaining({
+        messageKind: 'terminal-success',
+        sequence: 3,
+        attemptId: 'attempt-control-1'
+      })]
     }));
     expect(completeBrokerControlSession(
       completed.session,

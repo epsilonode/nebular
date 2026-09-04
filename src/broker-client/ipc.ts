@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 
 import {
   parseBrokerAttemptId,
@@ -26,13 +26,26 @@ export type BrokerOperation =
   | 'import-car'
   | 'doctor';
 
-export type BrokerRequestPayload = Readonly<{
-  operation: BrokerOperation;
+type BrokerRequestAuthorityHints = Readonly<{
   repositoryPathHint?: string;
   recipePathHint?: string;
   recipeRevision?: string;
   credentialSlotIds: readonly string[];
 }>;
+
+export type ExecuteRecipeRequestPayload = BrokerRequestAuthorityHints & Readonly<{
+  operation: 'execute-recipe';
+  grantIdHint: string;
+}>;
+
+export type NonExecuteBrokerOperation = Exclude<BrokerOperation, 'execute-recipe'>;
+
+export type NonExecuteRequestPayload = BrokerRequestAuthorityHints & Readonly<{
+  operation: NonExecuteBrokerOperation;
+  grantIdHint?: never;
+}>;
+
+export type BrokerRequestPayload = ExecuteRecipeRequestPayload | NonExecuteRequestPayload;
 
 type EnvelopeBase = Readonly<{
   protocolVersion: typeof BROKER_PROTOCOL_VERSION;
@@ -83,13 +96,28 @@ const baseSchema = z.object({
   attemptId: idSchema.optional()
 }).strict();
 
-const requestPayloadSchema = z.object({
-  operation: z.enum(['execute-recipe', 'status', 'cancel', 'grant', 'revoke', 'export-car', 'import-car', 'doctor']),
+const authorityHintShape = {
   repositoryPathHint: z.string().min(1).max(4096).optional(),
   recipePathHint: z.string().min(1).max(1024).optional(),
   recipeRevision: z.string().min(1).max(256).optional(),
   credentialSlotIds: z.array(z.string().min(1).max(128)).max(64)
+} as const;
+
+const executeRecipeRequestPayloadSchema = z.object({
+  ...authorityHintShape,
+  operation: z.literal('execute-recipe'),
+  grantIdHint: z.string().min(1).max(128).refine(value => !value.includes('\0'))
 }).strict();
+
+const nonExecuteRequestPayloadSchema = z.object({
+  ...authorityHintShape,
+  operation: z.enum(['status', 'cancel', 'grant', 'revoke', 'export-car', 'import-car', 'doctor'])
+}).strict();
+
+const requestPayloadSchema = z.discriminatedUnion('operation', [
+  executeRecipeRequestPayloadSchema,
+  nonExecuteRequestPayloadSchema
+]);
 
 const wireSchema = z.discriminatedUnion('messageKind', [
   baseSchema.extend({
@@ -138,13 +166,22 @@ const projectWire = (wire: WireMessage, base: EnvelopeBase): BrokerControlMessag
     case 'request': return {
       ...base,
       messageKind: wire.messageKind,
-      payload: {
-        operation: wire.payload.operation,
-        credentialSlotIds: wire.payload.credentialSlotIds,
-        ...(wire.payload.repositoryPathHint === undefined ? {} : { repositoryPathHint: wire.payload.repositoryPathHint }),
-        ...(wire.payload.recipePathHint === undefined ? {} : { recipePathHint: wire.payload.recipePathHint }),
-        ...(wire.payload.recipeRevision === undefined ? {} : { recipeRevision: wire.payload.recipeRevision })
-      }
+      payload: wire.payload.operation === 'execute-recipe'
+        ? {
+            operation: wire.payload.operation,
+            grantIdHint: wire.payload.grantIdHint,
+            credentialSlotIds: wire.payload.credentialSlotIds,
+            ...(wire.payload.repositoryPathHint === undefined ? {} : { repositoryPathHint: wire.payload.repositoryPathHint }),
+            ...(wire.payload.recipePathHint === undefined ? {} : { recipePathHint: wire.payload.recipePathHint }),
+            ...(wire.payload.recipeRevision === undefined ? {} : { recipeRevision: wire.payload.recipeRevision })
+          }
+        : {
+            operation: wire.payload.operation,
+            credentialSlotIds: wire.payload.credentialSlotIds,
+            ...(wire.payload.repositoryPathHint === undefined ? {} : { repositoryPathHint: wire.payload.repositoryPathHint }),
+            ...(wire.payload.recipePathHint === undefined ? {} : { recipePathHint: wire.payload.recipePathHint }),
+            ...(wire.payload.recipeRevision === undefined ? {} : { recipeRevision: wire.payload.recipeRevision })
+          }
     };
     case 'cancel': return { ...base, messageKind: wire.messageKind, payload: { expectedGeneration: wire.payload.expectedGeneration } };
     case 'progress': return { ...base, messageKind: wire.messageKind, payload: { phase: wire.payload.phase, detail: wire.payload.detail } };

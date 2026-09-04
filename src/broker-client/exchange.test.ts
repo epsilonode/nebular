@@ -45,6 +45,7 @@ const activeExchange = (): BrokerClientExchange => {
     sentAtMs: 1001,
     payload: {
       operation: 'execute-recipe',
+      grantIdHint: 'grant-1',
       repositoryPathHint: 'R:/Code/untrusted-alias',
       recipePathHint: 'recipe.xml',
       recipeRevision: 'revision-1',
@@ -79,6 +80,7 @@ describe('broker client inherited-IPC exchange', () => {
       requestId: 'exchange-1',
       sequence: 3,
       sentAtMs: 1003,
+      attemptId: 'attempt-exchange-1',
       payload: { code: 'completed', message: 'Execution completed.' }
     });
     const completed = unwrap(reduceBrokerClientExchange(progressed, {
@@ -89,7 +91,12 @@ describe('broker client inherited-IPC exchange', () => {
     expect(completed).toEqual(expect.objectContaining({
       state: 'terminal',
       progress: [{ phase: 'authority-admitted', detail: 'Repository authority admitted.' }],
-      terminal: { outcome: 'success', code: 'completed', message: 'Execution completed.' }
+      terminal: {
+        outcome: 'success',
+        code: 'completed',
+        message: 'Execution completed.',
+        attemptId: 'attempt-exchange-1'
+      }
     }));
     expect(reduceBrokerClientExchange(completed, {
       eventKind: 'control',
@@ -127,6 +134,59 @@ describe('broker client inherited-IPC exchange', () => {
     }))).toEqual(expect.objectContaining({
       state: 'terminal',
       terminal: expect.objectContaining({ outcome: 'cancelled' })
+    }));
+  });
+
+  it('rejects post-cancel progress and success while preserving the exact in-flight sequence race', () => {
+    const cancel = control({
+      protocolVersion: BROKER_PROTOCOL_VERSION,
+      messageKind: 'cancel',
+      requestId: 'exchange-1',
+      sequence: 2,
+      sentAtMs: 1002,
+      payload: { expectedGeneration: 0 }
+    });
+    const cancelling = unwrap(reduceBrokerClientExchange(activeExchange(), {
+      eventKind: 'control',
+      direction: 'client-to-broker',
+      message: cancel
+    }));
+    const postCancelProgress = control({
+      protocolVersion: BROKER_PROTOCOL_VERSION,
+      messageKind: 'progress',
+      requestId: 'exchange-1',
+      sequence: 3,
+      sentAtMs: 1003,
+      payload: { phase: 'late', detail: 'Must not cross cancellation.' }
+    });
+    const postCancelSuccess = control({
+      protocolVersion: BROKER_PROTOCOL_VERSION,
+      messageKind: 'terminal-success',
+      requestId: 'exchange-1',
+      sequence: 3,
+      sentAtMs: 1003,
+      payload: { code: 'late-success', message: 'Must not win after accepted cancellation.' }
+    });
+
+    expect(reduceBrokerClientExchange(cancelling, {
+      eventKind: 'control',
+      direction: 'broker-to-client',
+      message: postCancelProgress
+    })).toEqual(expect.objectContaining({ error: [expect.objectContaining({ code: 'protocol-mismatch' })] }));
+    expect(reduceBrokerClientExchange(cancelling, {
+      eventKind: 'control',
+      direction: 'broker-to-client',
+      message: postCancelSuccess
+    })).toEqual(expect.objectContaining({ error: [expect.objectContaining({ code: 'protocol-mismatch' })] }));
+
+    const racedSuccess = control({ ...postCancelSuccess, sequence: 2, sentAtMs: 1002 });
+    expect(unwrap(reduceBrokerClientExchange(cancelling, {
+      eventKind: 'control',
+      direction: 'broker-to-client',
+      message: racedSuccess
+    }))).toEqual(expect.objectContaining({
+      state: 'terminal',
+      terminal: expect.objectContaining({ outcome: 'success', code: 'late-success' })
     }));
   });
 

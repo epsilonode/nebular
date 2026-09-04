@@ -15,12 +15,13 @@ import {
   type CommitGrantWithConsent,
   type JournalResult
 } from './journal.ts';
-import { parseCredentialReference } from './lease.ts';
+import { parseCredentialReference, parseSecretExposureCorrelation } from './lease.ts';
 import {
   parseCanonicalRepository,
   parseCredentialSlotId,
   parseGrantId,
   parseProcessAttemptId,
+  parseReceiverId,
   parseRecipeRevision
 } from './primitives.ts';
 
@@ -60,8 +61,10 @@ const commandFixture = (): CommitGrantWithConsent => {
       operationId,
       repository,
       recipeRevision,
-      credentialReference: unwrapBroker(parseCredentialReference('credential-reference-1')),
-      credentialSlotIds: [credentialSlotId],
+      credentialBindings: [{
+        slotId: credentialSlotId,
+        credentialReference: unwrapBroker(parseCredentialReference('credential-reference-1'))
+      }],
       consentId,
       generation: 1,
       issuedAtMs: 1_000,
@@ -85,17 +88,42 @@ describe('nonsecret authority journal algebra', () => {
       issues: [expect.objectContaining({ code: 'journal-invalid' })]
     }));
 
+    const secondSlot = unwrapBroker(parseCredentialSlotId('radar-api'));
+    const secondReference = unwrapBroker(parseCredentialReference('credential-reference-2'));
+    const firstBinding = valid.grant.credentialBindings[0];
     const widened = {
       ...valid,
       grant: {
         ...valid.grant,
-        credentialSlotIds: [
-          ...valid.grant.credentialSlotIds,
-          unwrapBroker(parseCredentialSlotId('unapproved-slot'))
-        ]
+        credentialBindings: [
+          firstBinding,
+          { slotId: secondSlot, credentialReference: secondReference }
+        ] as const
       }
     };
     expect(validateGrantWithConsent(widened).type).toBe('err');
+
+    const exactTwoSlot = {
+      ...widened,
+      consent: { ...valid.consent, credentialSlotIds: [firstBinding.slotId, secondSlot] }
+    };
+    expect(validateGrantWithConsent(exactTwoSlot).type).toBe('ok');
+
+    expect(validateGrantWithConsent({
+      ...valid,
+      grant: {
+        ...valid.grant,
+        credentialBindings: [
+          firstBinding,
+          { slotId: firstBinding.slotId, credentialReference: secondReference }
+        ] as const
+      }
+    }).type).toBe('err');
+
+    expect(validateGrantWithConsent({
+      ...valid,
+      consent: { ...valid.consent, credentialSlotIds: [firstBinding.slotId, secondSlot] }
+    }).type).toBe('err');
   });
 
   it('keeps lease creation narrower than its typed authorized state', () => {
@@ -107,9 +135,12 @@ describe('nonsecret authority journal algebra', () => {
       grantId: authority.grant.id,
       grantGeneration: 1,
       processAttemptId: unwrapBroker(parseProcessAttemptId('attempt-1')),
+      receiverId: unwrapBroker(parseReceiverId('receiver-1')),
+      exposureCorrelation: unwrapBroker(parseSecretExposureCorrelation('exposure-1')),
       issuedAtMs: 1_200,
       expiresAtMs: 5_000,
-      terminatedAtMs: null,
+      updatedAtMs: 1_200,
+      cleanupReceipt: null,
       state: 'authorized' as const
     };
     expect(validateLeaseCreation({ operationId, lease }).type).toBe('ok');

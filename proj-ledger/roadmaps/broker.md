@@ -1,7 +1,7 @@
 # Development Credential Broker Roadmap
 
 @roadmap broker
-@updated 2026-08-23
+@updated 2026-09-04
 @meta name=roadmap-format content="../format-guidance.md"
 @meta name=roadmap-status content="active"
 @meta name=owner-project content="R:/Code/web/wx-teleport-cartridge"
@@ -287,15 +287,16 @@
 @memory ../memories/teleport/broker/broker-inherited-ipc-v1-contract.md
 @memory ../memories/teleport/broker/broker-cooperative-bootstrap-entrypoint.md
 @memory ../memories/teleport/broker/broker-durable-bootstrap-authority-and-cleanup.md
-@blocker The public broker root still needs its production durable-authority adapters and an admitted PM2 launch/current-parent verifier before this slice can prove a real managed application launch.
+@blocker The public control-child route now composes the production durable-authority, Git, SQLite, Windows Job, PM2 AMP-v1, inherited-IPC, launch, terminal-observation, and cleanup leaves. The production bootstrap-child resolver remains fail-closed where its own ports are unavailable. Neither route is release-ready until the installed four-artifact live E2E proves the complete PM2-managed cooperative launch, durable bootstrap bind, exact PM2 upgrade, terminal cleanup, artifact release, and no-exposure result on the real host.
 @evidence `broker-client` now has bounded ordinary control IPC, a real Bun inherited-IPC helper spawn, a distinct closed secret-bootstrap protocol, atomic environment-patch planning and current-process installation, deferred application import, callback-opaque secret values, and grant-to-lease-to-bootstrap seams. The private install cleanup capability rolls back after inconsistent receipts, acknowledgement/send/timeout/disconnect/helper-exit failures, and deferred import rejection; the Bun adapter removes only newly installed names, in reverse, idempotently. Import remains inert and cannot access `Bun.secrets` or privileged broker modules.
-@evidence The live two-process harness exercises the real Bun transport and process-environment leaves with a test authority composition and proves helper exit/no orphan. It does not bypass the intentionally unavailable production root or prove PM2-managed launch authority.
+@evidence The live two-process harness exercises the real Bun transport and process-environment leaves with a test authority composition and proves helper exit/no orphan. The installed four-artifact harness now additionally packs and installs all four artifacts into an isolated temporary Git consumer, provisions a keychain canary, commits a checked-in recipe, drives the real runner/broker/PM2 path, proves only a credential digest at the target, and removes the canary/workspace on every result. Its preflight passes. Focused Windows seams cover strict native-path PM2 metadata decoding, PM2 prepare dispatch/drain/wipe, exact-name ownership, durable reservation/replay, provisional bootstrap binding, Job-root observation, terminal-before-confirmation retention, exact containment upgrade, and cleanup-gated PM2 deletion.
+@proof_gap The real installed live run is not yet successful. Current host evidence proves the target's managed Windows Job first effect was `assigned`, its domain-separated Job-identity commitment matches the broker's expected PM2 payload identity, and PM2/current broker sessions match; the broker's separately opened named-Job observation nevertheless remains `pending` until the bounded bootstrap deadline. The current native observation algebra conflates an absent Job name and an opened Job with zero process IDs; split those redacted states, then resolve the resulting native session/query or handle-lifetime discrepancy without weakening exact identity, policy, incarnation, membership, or durable-journal requirements. Rerun the complete installed E2E through successful terminal cleanup afterward.
 @accept `recipe-runner.js` requests one checked-in Git-scoped recipe; one-shot broker control validates authority and materializes the requested command directly in PM2. A cooperative target bootstrap obtains declared credentials through a short-lived private broker exchange inside the managed process; no parent environment rewrite, `.env` file, or resident wrapper is introduced.
 @accept The JS/TS package exposes request and scoped-operation APIs; raw-token access requires an explicit elevated method and policy approval.
 @accept Clients reconnect safely, handle broker upgrades and lease expiry, and never cache secrets beyond the authorized operation lifetime.
 @accept Conformance proves unrelated project roots, expired grants, broader scopes, and environment/account mismatches cannot reuse a grant.
 
-### @work @partial extract and localize the Bake recipe kernel
+### @work @deferred extract and localize the Bake recipe kernel
 @memory ../memories/teleport/broker/broker-pk-recipe-runner-adoption.md
 @memory ../memories/teleport/broker/broker-bake-recipe-kernel-extraction.md
 @memory ../memories/teleport/broker/broker-local-recipe-integration-and-bundling.md
@@ -309,12 +310,13 @@
 @accept Harden generic parsing, normalization, parameter/port resolution, lifecycle vocabulary, receiver semantics, observation facts, and representative fixtures in Bake only until the admitted extraction boundary is stable enough to copy. Broker grants, credential slots, CAR transfer, keychain access, and authority policy are implemented only here.
 @accept Transplant admitted TypeScript source and fixtures into locally owned modules, sever all Bake imports and filesystem pointers, apply the strict FP/domain boundaries, and bundle from local entrypoints. Do not publish or consume a compiled Bake compatibility artifact as an intermediate architecture.
 @proof_gap Differential fixtures must prove decoding, normalization, argv resolution, lifecycle/status reduction, redaction, and rejected-field behavior before cutover. Build proofs must show no `R:/Code/pk`, `@bake/*`, Bake alias, source fallback, or undeclared shared chunk in runtime artifacts or declarations.
+@note Paused; currently deferred pending completion of the delegated production recipe/PM2 receiver substrate and its admission boundary.
 
 ### @work @partial establish four-entrypoint public upstream and builds
 @memory ../memories/teleport/broker/broker-four-artifact-type-boundaries.md
 @memory ../memories/teleport/broker/broker-typing-fp-implementation-sequence.md
 @memory ../memories/teleport/broker/broker-epsilonode-nebular-esm-distribution.md
-@blocker Run the real browser golden vector and finish the intended CLI/bin surfaces before calling distribution complete.
+@blocker Run the real browser golden vector, finish the intended CLI/bin surfaces, and close the real installed four-artifact broker/PM2/keychain E2E before calling distribution complete.
 @evidence GitHub reports `https://github.com/epsilonode/nebular` as PUBLIC with default branch `main`, matching the configured `origin` and package identity `@epsilonode/nebular`. Four thin root `.ts` entrypoints, conditional package exports, separate declarations, Mise/Bun builds with splitting disabled, and graph verification exist. `mise run verify` emits exactly `teleport.js`, `broker-client.js`, `recipe-runner.js`, and `broker.js`, resolves all four subpaths through an isolated consumer, and rejects any fifth export, undeclared chunk, privileged edge, old workspace pointer, absolute source path, or credential-shaped literal. `tooling/verify-installed-package.ts` additionally packs and installs the package into a fresh temporary consumer outside the workspace, rejects linked or escaped package resolution, independently typechecks the four installed declarations, runtime-imports all four subpaths, and proves their resolutions end at the installed `dist/*.js` files; the standalone proof observed export counts `[59, 48, 27, 152]` from a 761531-byte tarball. The verified implementation series is pushed and all four source entrypoints return HTTP 200 JavaScript from esm.sh at immutable commit `a97d66c0eb3bb8cdc3f9e7e8cb9b423a43bc2633` with repository-internal imports pinned to that same ref.
 @accept Add root TypeScript entrypoints `teleport.ts`, `broker-client.ts`, `recipe-runner.ts`, and `broker.ts`; internal modules remain layered and are not individually exposed as stable esm.sh paths.
 @accept Add Mise-managed Bun build tasks for the portable artifact, broker artifacts, complete distribution, and distribution verification. No build or package command bypasses Mise.
@@ -325,6 +327,22 @@
 @accept Keep broker administration/import/export commands in `broker.js` and recipe execution commands in `recipe-runner.js`; expose them through package `bin` mappings or equivalent Mise tasks without native executable compilation. Final human-facing aliases may be selected during packaging without changing the four artifact or subpath contracts.
 @accept Generate declarations through the pinned TypeScript toolchain and prove every public runtime export has an accurate declaration without exposing privileged internal modules through the portable entrypoint.
 @accept Add an import-graph gate that rejects Bun-only APIs, broker modules, OS keychain code, consent UI, process launch, and provider refresh implementations from `teleport.js`, and rejects direct keychain access from `broker-client.js`.
+
+### @work @deferred close installed four-artifact broker E2E
+@memory ../memories/teleport/broker/broker-four-upper-level-domains.md
+@memory ../memories/teleport/broker/broker-four-domain-atomic-quality-harness.md
+@memory ../memories/teleport/broker/broker-host-owned-pm2-prerequisite.md
+@memory ../memories/teleport/broker/broker-cooperative-bootstrap-entrypoint.md
+@memory ../memories/teleport/broker/broker-durable-bootstrap-authority-and-cleanup.md
+@memory ../memories/teleport/broker/broker-windows-process-tree-conformance.md
+@accept The success signal is one isolated installed-consumer execution using all four deliverables: `teleport.ts`, `broker-client.ts`, `recipe-runner.ts`, and `broker.ts`. It must use Bun through Mise, an already-running host-owned PM2 daemon, a canonical temporary Git repository, a committed recipe, a canary in the OS keychain, a cooperative Bun target, and no source fallback.
+@accept Success requires all of: target-only credential digest match; a trusted broker terminal outcome carrying the attempt identity; durable authority/lease/attempt state finalized; exact PM2 record absent; exact Windows Job absent; trusted artifacts absent; no secret exposure retained; canary deleted; and temporary workspace deleted. Target success by itself is insufficient.
+@evidence The isolated harness preflight succeeds and proves a pack/install/import of exactly four artifacts plus recipe admission and cleanup. Focused seam suites currently pass for the FP domain boundaries, artifact/package topology, keychain bridge, Git admission, SQLite journal, inherited IPC, cooperative bootstrap, PM2 AMP-v1 adapter, exact slot/ownership, Windows Job native leaves, provisional bootstrap state, exact containment upgrade, terminal cleanup, and redacted E2E receipts.
+@evidence The live harness has already corrected and tested: invalid `source.command` recipe provenance; escaped native Windows repository-path decoding in PM2 metadata; PM2 prepare request dispatch with asynchronous bounded response drain/wipe; terminal outcome attempt identity propagation; retry-only-exact PM2 cleanup observation; and no pre-containment target application effect. Its diagnostics are deliberately allowlisted and never expose PM2 metadata, environment, arguments, Job identity, PID, secret, or raw receipt contents.
+@remaining 1. Resolve why the target can atomically report managed-Job first-effect `assigned` and a matching domain-separated Job commitment while host `observeBootstrapRoot` sees the same named Job as pending. Audit native session/access/query semantics and process/Job handle lifetime; do not replace this with an unbounded delay, loose name match, direct shell launch, resident wrapper, or raw PM2 inspection.
+@remaining 2. Once exactly-one Job-root observation is proven, complete the bounded sequence: Job root -> current process incarnation -> exact Job policy/membership -> atomic materializing `bindBootstrap` -> private bootstrap exchange -> exact PM2 ownership observation -> atomic full containment/running bind. Preserve the preconfirmed-binding replay invariant and fail closed on any disagreement.
+@remaining 3. Rerun `mise run test-live-broker-e2e` until it produces the public success receipt. Then run the full verification and installed-consumer gates, record command evidence, update this roadmap only with verified facts, commit the implementation, and push the public `epsilonode/nebular` main branch.
+@note Paused; currently deferred pending a proven Windows Job-root observation and the bounded PM2 containment sequence.
 
 ### @work @ready add provider adapters and renewal
 @memory ../memories/teleport/broker/broker-deferred-console-provider-integration-gates.md

@@ -23,6 +23,7 @@ describe('recipe-runner request construction', () => {
     if (recipe.isErr() || path.isErr() || revision.isErr()) throw new Error('typed fixture construction failed');
     const request = buildExecuteRecipeRequest({
       recipe: recipe.value,
+      grantIdHint: 'grant-1',
       repositoryPathHint: 'R:/Code/weather',
       recipePathHint: path.value,
       recipeRevision: revision.value,
@@ -35,6 +36,7 @@ describe('recipe-runner request construction', () => {
         messageKind: 'request',
         payload: expect.objectContaining({
           operation: 'execute-recipe',
+          grantIdHint: 'grant-1',
           credentialSlotIds: ['weather-api']
         })
       })
@@ -48,6 +50,7 @@ describe('recipe-runner request construction', () => {
     if (recipe.isErr() || path.isErr() || revision.isErr()) throw new Error('typed fixture construction failed');
     expect(buildExecuteRecipeRequest({
       recipe: recipe.value,
+      grantIdHint: 'grant-1',
       repositoryPathHint: '',
       recipePathHint: path.value,
       recipeRevision: revision.value,
@@ -57,10 +60,21 @@ describe('recipe-runner request construction', () => {
     })).toEqual(expect.objectContaining({ error: [expect.objectContaining({ code: 'invalid-input' })] }));
     expect(buildExecuteRecipeRequest({
       recipe: recipe.value,
+      grantIdHint: 'grant-1',
       repositoryPathHint: 'R:/Code/weather',
       recipePathHint: path.value,
       recipeRevision: revision.value,
       requestId: 'invalid request id',
+      sequence: 0,
+      sentAtMs: 1000
+    })).toEqual(expect.objectContaining({ error: [expect.objectContaining({ code: 'client-contract-invalid' })] }));
+    expect(buildExecuteRecipeRequest({
+      recipe: recipe.value,
+      grantIdHint: 'x'.repeat(129),
+      repositoryPathHint: 'R:/Code/weather',
+      recipePathHint: path.value,
+      recipeRevision: revision.value,
+      requestId: 'request-1',
       sequence: 0,
       sentAtMs: 1000
     })).toEqual(expect.objectContaining({ error: [expect.objectContaining({ code: 'client-contract-invalid' })] }));

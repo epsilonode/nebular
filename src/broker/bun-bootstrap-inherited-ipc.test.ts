@@ -8,6 +8,7 @@ import {
 import {
   authorizeSecretLease,
   parseCredentialReference,
+  parseSecretExposureCorrelation,
   parseSecretLeaseId,
   secretLeaseOk,
   secretLeaseTaskErr,
@@ -41,10 +42,12 @@ const authorizedLease = (): AuthorizedSecretLease => {
   const slotId = parseCredentialSlotId('weather-api');
   const credentialReference = parseCredentialReference('credential-1');
   const leaseId = parseSecretLeaseId('lease-1');
+  const exposureCorrelation = parseSecretExposureCorrelation('exposure-1');
   const receiverId = parseReceiverId('pm2');
   const processAttemptId = parseProcessAttemptId('attempt-1');
   if (repository.isErr() || recipeRevision.isErr() || grantId.isErr() || slotId.isErr() ||
-      credentialReference.isErr() || leaseId.isErr() || receiverId.isErr() || processAttemptId.isErr()) {
+      credentialReference.isErr() || leaseId.isErr() || exposureCorrelation.isErr() || receiverId.isErr() ||
+      processAttemptId.isErr()) {
     throw new Error('expected valid broker bootstrap fixture');
   }
   const binding: SecretSlotBinding = {
@@ -70,6 +73,7 @@ const authorizedLease = (): AuthorizedSecretLease => {
     recipeRevision: recipeRevision.value,
     receiverId: receiverId.value,
     processAttemptId: processAttemptId.value,
+    exposureCorrelation: exposureCorrelation.value,
     bindings: [binding],
     requestedAtMs: 1_000,
     expiresAtMs: 1_500,
@@ -218,15 +222,19 @@ describe('privileged broker secret-bootstrap inherited IPC child', () => {
     );
 
     expect(result).toEqual(expect.objectContaining({
-      value: expect.objectContaining({ outcome: 'completed', secretsCleared: true })
+      value: expect.objectContaining({
+        outcome: 'exposed',
+        environmentInstalled: true,
+        brokerCopiesReleased: true
+      })
     }));
     expect(fake.sent().map(messageKind)).toEqual(['bootstrap-hello', 'bootstrap-delivery']);
     expect(JSON.stringify(fake.sent())).toContain(canary);
     expect(JSON.stringify(result)).not.toContain(canary);
     expect(reads).toEqual(['credential-1']);
     expect(transitions).toEqual([
-      expect.objectContaining({ expectedState: 'authorized', nextState: 'active', atMs: 1_001 }),
-      expect.objectContaining({ expectedState: 'active', nextState: 'consumed', atMs: 1_002 })
+      expect.objectContaining({ expectedState: 'authorized', nextState: 'delivering', atMs: 1_001 }),
+      expect.objectContaining({ expectedState: 'delivering', nextState: 'exposed', atMs: 1_002 })
     ]);
     expect(fake.disconnects()).toBe(1);
   });
@@ -252,7 +260,7 @@ describe('privileged broker secret-bootstrap inherited IPC child', () => {
     expect(fake.disconnects()).toBe(1);
   });
 
-  it('durably revokes an activated lease when secret delivery fails', async () => {
+  it('requires recovery when delivery may have exposed a secret but does not acknowledge', async () => {
     const lease = authorizedLease();
     const request = bootstrapRequest(lease);
     const fake = fakeRuntime([requestWire(request)]);
@@ -273,12 +281,12 @@ describe('privileged broker secret-bootstrap inherited IPC child', () => {
     );
 
     expect(result).toEqual(expect.objectContaining({
-      value: expect.objectContaining({ outcome: 'revoked', reason: 'secret-unavailable' })
+      error: [expect.objectContaining({ code: 'bootstrap-rejected' })]
     }));
     expect(fake.sent().map(messageKind)).toEqual(['bootstrap-hello']);
     expect(transitions).toEqual([
-      expect.objectContaining({ expectedState: 'authorized', nextState: 'active', atMs: 1_001 }),
-      expect.objectContaining({ expectedState: 'active', nextState: 'revoked', atMs: 1_002 })
+      expect.objectContaining({ expectedState: 'authorized', nextState: 'delivering', atMs: 1_001 }),
+      expect.objectContaining({ expectedState: 'delivering', nextState: 'recovery-required', atMs: 1_002 })
     ]);
     expect(fake.disconnects()).toBe(1);
   });
@@ -311,6 +319,43 @@ describe('privileged broker secret-bootstrap inherited IPC child', () => {
         atMs: lease.facts.expiresAtMs
       })
     ]);
+    expect(fake.disconnects()).toBe(1);
+  });
+
+  it('projects an unbound receiver race as the closed attempt-not-ready rejection', async () => {
+    const lease = authorizedLease();
+    const request = bootstrapRequest(lease);
+    const fake = fakeRuntime([requestWire(request)]);
+    const reads: string[] = [];
+    const transitions: BootstrapLeaseAuthorityTransition[] = [];
+    const basePorts = ports(lease, fake.runtime, reads, 'MUST_NOT_BE_READ', transitions);
+    const result = await runBrokerBootstrapInheritedIpcChild(
+      { exchangeId: request.exchangeId.value },
+      {
+        ...basePorts,
+        authority: {
+          ...basePorts.authority,
+          resolveAuthorizedLease: () => secretLeaseTaskErr({
+            code: 'attempt-not-ready',
+            message: 'private receiver timing detail'
+          })
+        }
+      }
+    );
+
+    expect(result).toEqual(expect.objectContaining({
+      error: [expect.objectContaining({ code: 'attempt-not-ready' })]
+    }));
+    expect(fake.sent()).toEqual([
+      expect.objectContaining({ messageKind: 'bootstrap-hello' }),
+      expect.objectContaining({
+        messageKind: 'bootstrap-rejected',
+        payload: { code: 'attempt-not-ready' }
+      })
+    ]);
+    expect(JSON.stringify(fake.sent())).not.toContain('private receiver timing detail');
+    expect(reads).toEqual([]);
+    expect(transitions).toEqual([]);
     expect(fake.disconnects()).toBe(1);
   });
 

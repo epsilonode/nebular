@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  brokerTaskOk,
+  authorityTaskOk,
   parseCanonicalRepository,
+  parseCredentialReference,
   parseCredentialSlotId as parseBrokerCredentialSlotId,
   parseGrantId,
   parseRecipeRevision as parseBrokerRecipeRevision,
@@ -31,6 +32,7 @@ const runnerRequest = (revisionValue: string) => {
   if (recipe.isErr() || path.isErr() || revision.isErr()) throw new Error('typed runner fixture construction failed');
   const request = buildExecuteRecipeRequest({
     recipe: recipe.value,
+    grantIdHint: 'grant-1',
     repositoryPathHint: 'R:/Code/weather-caller-alias',
     recipePathHint: path.value,
     recipeRevision: revision.value,
@@ -43,26 +45,31 @@ const runnerRequest = (revisionValue: string) => {
 };
 
 const authorityPorts = (grantReads: string[]): BrokerAuthorityPorts => {
+  const recipe = decodeAndAdmitRecipeXml(xml);
   const repository = parseCanonicalRepository('R:/Code/weather');
   const revision = parseBrokerRecipeRevision('revision-1');
   const grantId = parseGrantId('grant-1');
   const slot = parseBrokerCredentialSlotId('weather-api');
-  if (repository.isErr() || revision.isErr() || grantId.isErr() || slot.isErr()) throw new Error('typed broker fixture construction failed');
+  const credentialReference = parseCredentialReference('credential-weather');
+  if (recipe.isErr() || repository.isErr() || revision.isErr() || grantId.isErr() || slot.isErr() ||
+      credentialReference.isErr()) throw new Error('typed broker fixture construction failed');
   return {
-    canonicalizeRepository: () => brokerTaskOk(repository.value),
-    resolveRecipe: canonicalRepository => brokerTaskOk({
+    canonicalizeRepository: () => authorityTaskOk(repository.value),
+    resolveRecipe: canonicalRepository => authorityTaskOk({
       repository: canonicalRepository,
       relativePath: 'recipes/weather.xml',
       revision: revision.value,
-      credentialSlotIds: [slot.value]
+      credentialSlotIds: [slot.value],
+      admittedRecipe: recipe.value
     }),
-    readGrant: (canonicalRepository, recipeRevision) => {
-      grantReads.push(`${canonicalRepository}:${recipeRevision}`);
-      return brokerTaskOk({
+    readGrant: selectedGrantId => {
+      grantReads.push(selectedGrantId);
+      return authorityTaskOk({
         id: grantId.value,
-        repository: canonicalRepository,
-        recipeRevision,
-        credentialSlotIds: [slot.value],
+        generation: 1,
+        repository: repository.value,
+        recipeRevision: revision.value,
+        credentialBindings: [{ slotId: slot.value, credentialReference: credentialReference.value }],
         expiresAtMs: 2000,
         revoked: false
       });
@@ -80,7 +87,7 @@ describe('recipe-runner to broker authority seam', () => {
         recipe: expect.objectContaining({ repository: 'R:/Code/weather' })
       })
     }));
-    expect(grantReads).toEqual(['R:/Code/weather:revision-1']);
+    expect(grantReads).toEqual(['grant-1']);
   });
 
   it('rejects caller revision drift before reading a grant', async () => {

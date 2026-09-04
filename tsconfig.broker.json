@@ -4,6 +4,6 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["bun"]
   },
-  "include": ["broker.ts", "src/broker/**/*.ts"],
+  "include": ["broker.ts", "src/recipe-contract/**/*.ts", "src/broker/**/*.ts"],
   "exclude": ["src/**/*.test.ts", "src/**/__lint_negative__/**", "src/**/__type_negative__/**"]
 }

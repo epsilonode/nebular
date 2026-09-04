@@ -19,8 +19,8 @@ if (result.isErr()) {
 }
 if (result.value.helperExitCode !== 0 ||
     result.value.terminal.outcome !== 'success' ||
-    result.value.terminal.code !== 'broker-ready' ||
-    result.value.progress.length !== 1) {
+    result.value.terminal.code !== 'pm2-compatible' ||
+    result.value.progress.length !== 2) {
   throw new Error('Inherited IPC live conformance returned an invalid terminal receipt.');
 }
 

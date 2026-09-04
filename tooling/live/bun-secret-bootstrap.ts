@@ -8,6 +8,7 @@ import {
 import {
   authorizeSecretLease,
   parseCredentialReference,
+  parseSecretExposureCorrelation,
   parseSecretLeaseId,
   secretLeaseTaskErr,
   secretLeaseTaskOk,
@@ -41,6 +42,7 @@ const LIVE_GRANT_ID = 'live-bootstrap-grant-1';
 const LIVE_SLOT_ID = 'live-bootstrap-slot-1';
 const LIVE_CREDENTIAL_REFERENCE = 'live-bootstrap-credential-1';
 const LIVE_LEASE_ID = 'live-bootstrap-lease-1';
+const LIVE_EXPOSURE_CORRELATION = 'live-bootstrap-exposure-1';
 const LIVE_RECEIVER_ID = 'pm2';
 const LIVE_PROCESS_ATTEMPT_ID = 'live-bootstrap-attempt-1';
 const LIVE_EXCHANGE_ID = 'live-bootstrap-exchange-1';
@@ -59,10 +61,12 @@ const liveAuthorizedLease = (nowMs: number): AuthorizedSecretLease => {
   const slotId = parseCredentialSlotId(LIVE_SLOT_ID);
   const credentialReference = parseCredentialReference(LIVE_CREDENTIAL_REFERENCE);
   const leaseId = parseSecretLeaseId(LIVE_LEASE_ID);
+  const exposureCorrelation = parseSecretExposureCorrelation(LIVE_EXPOSURE_CORRELATION);
   const receiverId = parseReceiverId(LIVE_RECEIVER_ID);
   const processAttemptId = parseProcessAttemptId(LIVE_PROCESS_ATTEMPT_ID);
   if (repository.isErr() || recipeRevision.isErr() || grantId.isErr() || slotId.isErr() ||
-      credentialReference.isErr() || leaseId.isErr() || receiverId.isErr() || processAttemptId.isErr()) {
+      credentialReference.isErr() || leaseId.isErr() || exposureCorrelation.isErr() || receiverId.isErr() ||
+      processAttemptId.isErr()) {
     throw new Error('Live bootstrap authority fixture could not be constructed.');
   }
   const binding: SecretSlotBinding = {
@@ -88,6 +92,7 @@ const liveAuthorizedLease = (nowMs: number): AuthorizedSecretLease => {
     recipeRevision: recipeRevision.value,
     receiverId: receiverId.value,
     processAttemptId: processAttemptId.value,
+    exposureCorrelation: exposureCorrelation.value,
     bindings: [binding],
     requestedAtMs: nowMs,
     expiresAtMs: nowMs + 20_000,

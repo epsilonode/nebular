@@ -3,6 +3,8 @@ import type {
   CommitGrantWithConsent,
   ConsentEvidenceRecord,
   ConsentId,
+  GrantCredentialBinding,
+  GrantCredentialBindingSet,
   JournalIssues,
   JournalOperationId,
   RedactedAuthorityDigest
@@ -195,6 +197,17 @@ export type ProviderAuthority = Readonly<{
   requirements: AuthorityRequirements;
 }>;
 
+export type AuthorityCredentialBinding = Readonly<{
+  credentialReference: CredentialReference;
+  credentialSlotIds: CredentialSlotSet;
+  providerAuthority: ProviderAuthority;
+}>;
+
+export type AuthorityCredentialBindingSet = readonly [
+  AuthorityCredentialBinding,
+  ...AuthorityCredentialBinding[]
+];
+
 export type ConsentPurpose = 'credential-enrollment' | 'repository-approval';
 
 export type AuthorityGrantProposal = Readonly<{
@@ -203,10 +216,8 @@ export type AuthorityGrantProposal = Readonly<{
   recipeRevision: RecipeRevision;
   recipeDisplayPath: RecipeDisplayPath;
   requestingExecutable: RequestingExecutable;
-  credentialReference: CredentialReference;
-  credentialSlotIds: CredentialSlotSet;
+  credentialBindings: AuthorityCredentialBindingSet;
   authorityDigest: RedactedAuthorityDigest;
-  providerAuthority: ProviderAuthority;
   promptVersion: ConsentPromptVersion;
   consentPurpose: ConsentPurpose;
   requestedGrantExpiresAt: AuthorityInstant;
@@ -229,8 +240,7 @@ export type ParsedAuthorityRequest = SealedAuthorityRequest & Readonly<{
 }>;
 
 export type AcceptedAuthorityPolicy = Readonly<{
-  providerAuthority: ProviderAuthority;
-  credentialSlotIds: CredentialSlotSet;
+  credentialBindings: AuthorityCredentialBindingSet;
   grantExpiresAt: AuthorityInstant;
   acceptedAt: AuthorityInstant;
 }>;
@@ -302,8 +312,7 @@ export type AuthorityRequestEvent =
   | Readonly<{
       type: 'policy-accepted';
       at: AuthorityInstant;
-      providerAuthority: ProviderAuthority;
-      credentialSlotIds: CredentialSlotSet;
+      credentialBindings: AuthorityCredentialBindingSet;
       grantExpiresAt: AuthorityInstant;
     }>
   | Readonly<{
@@ -322,8 +331,7 @@ export type AuthorityConsentDisplay = Readonly<{
   recipeRevision: RecipeRevision;
   recipeDisplayPath: RecipeDisplayPath;
   requestingExecutable: RequestingExecutable;
-  providerAuthority: ProviderAuthority;
-  credentialSlotIds: CredentialSlotSet;
+  credentialBindings: AuthorityCredentialBindingSet;
   deliveryMode: 'cooperative-bootstrap';
   grantExpiresAt: AuthorityInstant;
 }>;
@@ -451,12 +459,26 @@ const authorityAtoms = (requirements: AuthorityRequirements): readonly Authority
 const hasDistinctValues = (values: readonly Readonly<{ value: string }>[]): boolean =>
   values.every((value, index) => values.findIndex(candidate => candidate.value === value.value) === index);
 
+const credentialBindingSlots = (
+  bindings: AuthorityCredentialBindingSet
+): readonly CredentialSlotId[] => bindings.flatMap(binding => binding.credentialSlotIds);
+
+const validCredentialBinding = (binding: AuthorityCredentialBinding): boolean =>
+  binding.credentialReference.value.length > 0 &&
+  binding.credentialSlotIds.length > 0 &&
+  hasDistinctValues(binding.credentialSlotIds.map(value => ({ value }))) &&
+  authorityAtoms(binding.providerAuthority.requirements).length > 0 &&
+  hasDistinctValues(authorityAtoms(binding.providerAuthority.requirements));
+
+const validCredentialBindings = (bindings: AuthorityCredentialBindingSet): boolean =>
+  bindings.length > 0 &&
+  bindings.every(validCredentialBinding) &&
+  hasDistinctValues(bindings.map(binding => binding.credentialReference)) &&
+  hasDistinctValues(credentialBindingSlots(bindings).map(value => ({ value })));
+
 const validProposal = (proposal: AuthorityGrantProposal): boolean =>
   Number.isSafeInteger(proposal.grantGeneration) && proposal.grantGeneration >= 1 &&
-  proposal.credentialSlotIds.length > 0 &&
-  hasDistinctValues(proposal.credentialSlotIds.map(value => ({ value }))) &&
-  authorityAtoms(proposal.providerAuthority.requirements).length > 0 &&
-  hasDistinctValues(authorityAtoms(proposal.providerAuthority.requirements));
+  validCredentialBindings(proposal.credentialBindings);
 
 const sameAccount = (left: ProviderAccount, right: ProviderAccount): boolean =>
   left.type === 'unspecified'
@@ -480,6 +502,42 @@ const slotsSubset = (candidate: CredentialSlotSet, authority: CredentialSlotSet)
 
 const sameAuthority = (left: ProviderAuthority, right: ProviderAuthority): boolean =>
   providerAuthoritySubset(left, right) && providerAuthoritySubset(right, left);
+
+const credentialBindingSubset = (
+  candidate: AuthorityCredentialBinding,
+  authority: AuthorityCredentialBinding
+): boolean => candidate.credentialReference.value === authority.credentialReference.value &&
+  providerAuthoritySubset(candidate.providerAuthority, authority.providerAuthority) &&
+  candidate.credentialSlotIds.length === authority.credentialSlotIds.length &&
+  slotsSubset(candidate.credentialSlotIds, authority.credentialSlotIds);
+
+const credentialBindingsSubset = (
+  candidate: AuthorityCredentialBindingSet,
+  authority: AuthorityCredentialBindingSet
+): boolean => validCredentialBindings(candidate) && candidate.every(binding => {
+  const requested = authority.find(
+    allowed => allowed.credentialReference.value === binding.credentialReference.value
+  );
+  return requested !== undefined && credentialBindingSubset(binding, requested);
+}) && candidate.length === authority.length;
+
+const sameCredentialBinding = (
+  left: AuthorityCredentialBinding,
+  right: AuthorityCredentialBinding
+): boolean => left.credentialReference.value === right.credentialReference.value &&
+  sameAuthority(left.providerAuthority, right.providerAuthority) &&
+  left.credentialSlotIds.length === right.credentialSlotIds.length &&
+  slotsSubset(left.credentialSlotIds, right.credentialSlotIds);
+
+const sameCredentialBindings = (
+  left: AuthorityCredentialBindingSet,
+  right: AuthorityCredentialBindingSet
+): boolean => left.length === right.length && left.every(binding => {
+  const candidate = right.find(
+    current => current.credentialReference.value === binding.credentialReference.value
+  );
+  return candidate !== undefined && sameCredentialBinding(binding, candidate);
+});
 
 const atOrAfter = (left: AuthorityInstant, right: AuthorityInstant): boolean => left.value >= right.value;
 const before = (left: AuthorityInstant, right: AuthorityInstant): boolean => left.value < right.value;
@@ -548,13 +606,11 @@ const acceptPolicy = (
       event.grantExpiresAt.value > state.proposal.requestedGrantExpiresAt.value) {
     return authorityLifecycleErr({ code: 'authority-invalid', message: 'Accepted grant lifetime is invalid.' });
   }
-  if (!providerAuthoritySubset(event.providerAuthority, state.proposal.providerAuthority) ||
-      !slotsSubset(event.credentialSlotIds, state.proposal.credentialSlotIds)) {
+  if (!credentialBindingsSubset(event.credentialBindings, state.proposal.credentialBindings)) {
     return authorityLifecycleErr({ code: 'authority-widened', message: 'Policy cannot widen requested credential authority.' });
   }
   const policy: AcceptedAuthorityPolicy = {
-    providerAuthority: event.providerAuthority,
-    credentialSlotIds: event.credentialSlotIds,
+    credentialBindings: event.credentialBindings,
     grantExpiresAt: event.grantExpiresAt,
     acceptedAt: event.at
   };
@@ -566,8 +622,10 @@ const acceptPolicy = (
     proposal: state.proposal,
     policy
   };
-  const authorityNarrowed = !sameAuthority(event.providerAuthority, state.proposal.providerAuthority) ||
-    event.credentialSlotIds.length !== state.proposal.credentialSlotIds.length;
+  const authorityNarrowed = !sameCredentialBindings(
+    event.credentialBindings,
+    state.proposal.credentialBindings
+  );
   const warnings: readonly AuthorityLifecycleWarning[] = [
     ...(authorityNarrowed ? [{
       code: 'authority-narrowed' as const,
@@ -590,8 +648,7 @@ const consentDisplay = (state: PolicyAcceptedAuthorityRequest): AuthorityConsent
   recipeRevision: state.proposal.recipeRevision,
   recipeDisplayPath: state.proposal.recipeDisplayPath,
   requestingExecutable: state.proposal.requestingExecutable,
-  providerAuthority: state.policy.providerAuthority,
-  credentialSlotIds: state.policy.credentialSlotIds,
+  credentialBindings: state.policy.credentialBindings,
   deliveryMode: state.proposal.deliveryMode,
   grantExpiresAt: state.policy.grantExpiresAt
 });
@@ -646,7 +703,7 @@ const consentEvidence = (
   recipeRevision: state.proposal.recipeRevision,
   authorityDigest: state.proposal.authorityDigest,
   promptVersion: state.proposal.promptVersion.value,
-  credentialSlotIds: state.policy.credentialSlotIds,
+  credentialSlotIds: credentialBindingSlots(state.policy.credentialBindings),
   deliveryMode: state.proposal.deliveryMode,
   grantExpiresAtMs: state.policy.grantExpiresAt.value,
   occurredAtMs: at.value,
@@ -789,7 +846,7 @@ export const reduceAuthorityRequest = (
 
 export type AuthorityGrantFacts = Readonly<{
   command: CommitGrantWithConsent;
-  providerAuthority: ProviderAuthority;
+  credentialBindings: AuthorityCredentialBindingSet;
 }>;
 
 export type PendingAuthorityGrant = SealedAuthorityGrant & Readonly<{
@@ -909,6 +966,29 @@ const grantCommitEffect = (facts: AuthorityGrantFacts): CommitAuthorityGrantEffe
   command: facts.command
 });
 
+const toGrantCredentialBinding = (
+  slotId: CredentialSlotId,
+  credentialReference: CredentialReference
+): GrantCredentialBinding => ({ slotId, credentialReference });
+
+const expandGrantCredentialBinding = (
+  binding: AuthorityCredentialBinding
+): readonly GrantCredentialBinding[] => binding.credentialSlotIds.map(slotId =>
+  toGrantCredentialBinding(slotId, binding.credentialReference));
+
+const toGrantCredentialBindings = (
+  bindings: AuthorityCredentialBindingSet
+): GrantCredentialBindingSet => {
+  const first = bindings[0];
+  const head = toGrantCredentialBinding(first.credentialSlotIds[0], first.credentialReference);
+  const tail: readonly GrantCredentialBinding[] = [
+    ...first.credentialSlotIds.slice(1).map(slotId =>
+      toGrantCredentialBinding(slotId, first.credentialReference)),
+    ...bindings.slice(1).flatMap(expandGrantCredentialBinding)
+  ];
+  return [head, ...tail];
+};
+
 export const deriveGrantFromApprovedRequest = (
   request: ApprovedAuthorityRequest
 ): AuthorityLifecycleResult<AuthorityGrantTransition> => {
@@ -923,8 +1003,7 @@ export const deriveGrantFromApprovedRequest = (
       operationId: request.operationId,
       repository: request.proposal.repository,
       recipeRevision: request.proposal.recipeRevision,
-      credentialReference: request.proposal.credentialReference,
-      credentialSlotIds: request.policy.credentialSlotIds,
+      credentialBindings: toGrantCredentialBindings(request.policy.credentialBindings),
       consentId: request.consent.id,
       generation: request.proposal.grantGeneration,
       issuedAtMs: request.consent.occurredAtMs,
@@ -934,7 +1013,7 @@ export const deriveGrantFromApprovedRequest = (
   };
   const facts: AuthorityGrantFacts = {
     command,
-    providerAuthority: request.policy.providerAuthority
+    credentialBindings: request.policy.credentialBindings
   };
   const pending: PendingAuthorityGrant = {
     [authorityGrantSeal]: true,

@@ -54,8 +54,8 @@ export type BrokerControlOpen = Readonly<{
 }>;
 
 export type BrokerControlCompletion =
-  | Readonly<{ outcome: 'success'; code: string; message: string }>
-  | Readonly<{ outcome: 'failure'; code: string; message: string }>;
+  | Readonly<{ outcome: 'success'; code: string; message: string; attemptId?: BrokerAttemptId }>
+  | Readonly<{ outcome: 'failure'; code: string; message: string; attemptId?: BrokerAttemptId }>;
 
 const nextSequence = (sequence: BrokerSequence): BrokerResult<BrokerSequence> => {
   const parsed = parseBrokerSequence(sequence + 1);
@@ -261,7 +261,9 @@ export const completeBrokerControlSession = (
       requestId: session.requestId,
       sequence: session.nextSequence,
       sentAtMs,
-      ...(session.authorized.request.attemptId === undefined ? {} : { attemptId: session.authorized.request.attemptId }),
+      ...(completion.attemptId === undefined
+        ? responseIdentity(session.authorized.request)
+        : { attemptId: completion.attemptId }),
       payload: { code: completion.code, message: completion.message }
     };
     return {

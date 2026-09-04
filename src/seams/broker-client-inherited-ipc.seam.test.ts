@@ -15,6 +15,7 @@ import {
   type BrokerControlMessage,
   type BrokerRequestMessage
 } from '../broker-client/public.ts';
+import { decodeAndAdmitRecipeXml } from '../recipe-contract/public.ts';
 import {
   authorizeExecution,
   brokerOk,
@@ -23,6 +24,7 @@ import {
   handleBrokerControlInput,
   openBrokerControlSession,
   parseCanonicalRepository,
+  parseCredentialReference,
   parseCredentialSlotId,
   parseGrantId,
   parseRecipeRevision,
@@ -40,6 +42,12 @@ const unwrapClient = <T>(result: BrokerClientResult<T>): T => {
 const unwrapBroker = <T>(result: BrokerResult<T>): T => {
   if (result.isErr()) throw new Error(result.error[0].message);
   return result.value;
+};
+
+const credentialReference = () => {
+  const parsed = parseCredentialReference('credential-weather');
+  if (parsed.isErr()) throw new Error('credential reference fixture construction failed');
+  return parsed.value;
 };
 
 const control = (input: unknown): BrokerControlMessage =>
@@ -65,20 +73,31 @@ const onlyFrame = (messages: readonly BrokerControlMessage[]): BrokerControlMess
 };
 
 const authorizedExecution = (request: BrokerRequestMessage): AuthorizedExecution => {
+  const admittedRecipe = decodeAndAdmitRecipeXml(`<recipe schema="wx.recipe/v1" id="weather" receiver="pm2" lifecycle="one-shot">
+    <timeout ms="20000" />
+    <exec name="weather-once" cwd="." tool="mise"><arg>run</arg><arg>weather</arg></exec>
+    <credential-slot id="weather-api" provider="weather" environment="production" delivery="environment" inject="WEATHER_TOKEN">
+      <scope>alerts:read</scope>
+    </credential-slot>
+  </recipe>`);
   const repository = unwrapBroker(parseCanonicalRepository('R:/Code/canonical'));
   const revision = unwrapBroker(parseRecipeRevision('revision-1'));
   const slot = unwrapBroker(parseCredentialSlotId('weather-api'));
   const grantId = unwrapBroker(parseGrantId('grant-1'));
+  const reference = credentialReference();
+  if (admittedRecipe.isErr()) throw new Error('admitted recipe fixture construction failed');
   return unwrapBroker(authorizeExecution(request, {
     repository,
     relativePath: 'recipe.xml',
     revision,
-    credentialSlotIds: [slot]
+    credentialSlotIds: [slot],
+    admittedRecipe: admittedRecipe.value
   }, {
     id: grantId,
+    generation: 1,
     repository,
     recipeRevision: revision,
-    credentialSlotIds: [slot],
+    credentialBindings: [{ slotId: slot, credentialReference: reference }],
     expiresAtMs: 2000,
     revoked: false
   }, 1000));
@@ -120,6 +139,7 @@ const establishActiveSeam = (): ActiveSeam => {
     sentAtMs: 1001,
     payload: {
       operation: 'execute-recipe',
+      grantIdHint: 'grant-1',
       repositoryPathHint: 'R:/Code/client-controlled-alias',
       recipePathHint: 'recipe.xml',
       recipeRevision: 'revision-1',

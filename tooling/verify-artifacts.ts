@@ -109,6 +109,30 @@ entrypointNames.forEach(entrypoint => {
   assertAuthorityGraph(entrypoint, outputFor(evidence, entrypoint));
 });
 
+const sharedRecipeKernelInputs = [
+  'src/recipe-contract/canonical.ts',
+  'src/recipe-contract/model.ts',
+  'src/recipe-contract/primitives.ts',
+  'src/recipe-contract/result.ts',
+  'src/recipe-contract/xml.ts'
+] as const;
+(['recipe-runner', 'broker'] as const).forEach(entrypoint => {
+  const inputs = Object.keys(outputFor(bunEvidence, entrypoint).inputs).map(normalized);
+  const missing = sharedRecipeKernelInputs.filter(required =>
+    !inputs.some(input => input.endsWith(required))
+  );
+  if (missing.length > 0) {
+    throw new Error(`${entrypoint}.js does not consume the shared local recipe kernel: ${missing.join(', ')}`);
+  }
+});
+const recipeRunnerPublicSource = await readFile(
+  resolve(projectRoot, 'src', 'recipe-runner', 'public.ts'),
+  'utf8'
+);
+if (!recipeRunnerPublicSource.includes("export * from '../recipe-contract/public.ts';")) {
+  throw new Error('recipe-runner public authority does not route through the shared recipe-contract barrel.');
+}
+
 const forbiddenArtifactText = [
   'R:/Code/',
   'R:\\Code\\',

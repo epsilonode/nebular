@@ -1,5 +1,3 @@
-import { match } from 'ts-pattern';
-
 import type { CredentialSlotId, GrantId, ProcessAttemptId, ReceiverId } from './primitives.ts';
 import {
   reduceSecretLease,
@@ -7,17 +5,16 @@ import {
   secretLeaseOk,
   secretLeaseTaskErr,
   secretLeaseTaskOk,
-  type ActiveSecretLease,
   type AuthorizedSecretLease,
-  type ConsumedSecretLease,
   type CredentialReference,
-  type RevokedSecretLease,
+  type DeliveringSecretLease,
+  type ExposedSecretLease,
+  type RecoveryRequiredSecretLease,
   type SecretLeaseId,
   type SecretLeaseIssueCode,
   type SecretLeaseIssues,
   type SecretLeaseResult,
   type SecretLeaseTaskResult,
-  type SecretLeaseRevocationReason,
   type SecretSlotBinding
 } from './lease.ts';
 
@@ -61,12 +58,13 @@ export type BootstrapSecretReceipt = Readonly<{
   leaseId: SecretLeaseId;
   processAttemptId: ProcessAttemptId;
   installedSlotIds: readonly CredentialSlotId[];
-  secretsCleared: true;
+  environmentInstalled: true;
+  brokerCopiesReleased: true;
 }>;
 
 /**
- * `runWithSecrets` owns atomic staging, application execution, and cleanup.
- * It must clear staged/bootstrap copies before returning either branch.
+ * `runWithSecrets` owns atomic broker-side staging and exchange cleanup.
+ * It clears broker/transport copies, but never claims target exposure ended.
  */
 export type BootstrapSecretPort = Readonly<{
   runWithSecrets: (
@@ -85,34 +83,35 @@ export type SecretDeliveryPorts = Readonly<{
   bootstrap: BootstrapSecretPort;
 }>;
 
-export type CompletedSecretDelivery = Readonly<{
-  outcome: 'completed';
-  lease: ConsumedSecretLease;
+export type ExposedSecretDelivery = Readonly<{
+  outcome: 'exposed';
+  lease: ExposedSecretLease;
   leaseId: SecretLeaseId;
   processAttemptId: ProcessAttemptId;
   deliveredSlotIds: readonly CredentialSlotId[];
-  secretsCleared: true;
+  environmentInstalled: true;
+  brokerCopiesReleased: true;
 }>;
 
-export type RevokedSecretDelivery = Readonly<{
-  outcome: 'revoked';
-  lease: RevokedSecretLease;
+export type RecoveryRequiredSecretDelivery = Readonly<{
+  outcome: 'recovery-required';
+  lease: RecoveryRequiredSecretLease;
   leaseId: SecretLeaseId;
   processAttemptId: ProcessAttemptId;
   deliveredSlotIds: readonly CredentialSlotId[];
-  secretsCleared: true;
-  reason: SecretLeaseRevocationReason;
+  exposureMayHaveOccurred: true;
+  brokerCopiesReleased: true;
   issueCodes: readonly SecretLeaseIssueCode[];
 }>;
 
-export type SecretDeliveryTerminal = CompletedSecretDelivery | RevokedSecretDelivery;
+export type SecretDeliveryOutcome = ExposedSecretDelivery | RecoveryRequiredSecretDelivery;
 
 const toBootstrapSlot = (binding: SecretSlotBinding): BootstrapSecretSlot => ({
   slotId: binding.slotId,
   environmentName: binding.environmentName
 });
 
-const toBootstrapContext = (lease: ActiveSecretLease): BootstrapSecretContext => ({
+const toBootstrapContext = (lease: DeliveringSecretLease): BootstrapSecretContext => ({
   leaseId: lease.facts.id,
   grantId: lease.facts.grantId,
   grantGeneration: lease.facts.grantGeneration,
@@ -144,107 +143,99 @@ const sameSlotSet = (left: readonly CredentialSlotId[], right: readonly Credenti
     normalizedLeft.every((slotId, index) => slotId === normalizedRight[index]);
 };
 
-const revocationReason = (issues: SecretLeaseIssues): SecretLeaseRevocationReason =>
-  match<SecretLeaseIssueCode, SecretLeaseRevocationReason>(issues[0].code)
-    .with('secret-unavailable', () => 'secret-unavailable')
-    .with('grant-revoked', () => 'grant-revoked')
-    .with('grant-expired', 'lease-expired', () => 'lease-expired')
-    .otherwise(() => 'bootstrap-rejected');
-
-const revokeAfterDeliveryFailure = (
-  lease: ActiveSecretLease,
+const recoverAfterDeliveryFailure = (
+  lease: DeliveringSecretLease,
   atMs: number,
   issues: SecretLeaseIssues
-): SecretLeaseResult<SecretDeliveryTerminal> => {
-  const reason = revocationReason(issues);
-  return reduceSecretLease(lease, { type: 'revoke', atMs, reason }).andThen(terminal =>
-    terminal.state === 'revoked'
-      ? secretLeaseOk<SecretDeliveryTerminal>({
-          outcome: 'revoked',
+): SecretLeaseResult<SecretDeliveryOutcome> =>
+  reduceSecretLease(lease, { type: 'require-recovery', atMs, reason: 'delivery-failed' }).andThen(terminal =>
+    terminal.state === 'recovery-required'
+      ? secretLeaseOk<SecretDeliveryOutcome>({
+          outcome: 'recovery-required',
           lease: terminal,
           leaseId: terminal.facts.id,
           processAttemptId: terminal.facts.processAttemptId,
           deliveredSlotIds: [],
-          secretsCleared: true,
-          reason,
+          exposureMayHaveOccurred: true,
+          brokerCopiesReleased: true,
           issueCodes: issues.map(issue => issue.code)
         })
       : secretLeaseErr({
           code: 'lease-transition-invalid',
-          message: 'Secret delivery failure did not revoke its lease.'
+          message: 'Secret delivery failure did not enter durable recovery.'
         })
   );
-};
 
-const completeDelivery = (
-  lease: ActiveSecretLease,
+const acknowledgeExposure = (
+  lease: DeliveringSecretLease,
   receipt: BootstrapSecretReceipt,
   atMs: number
-): SecretLeaseResult<SecretDeliveryTerminal> => {
+): SecretLeaseResult<SecretDeliveryOutcome> => {
   const expectedSlotIds: readonly CredentialSlotId[] = lease.facts.bindings.map(binding => binding.slotId);
   if (receipt.leaseId.value !== lease.facts.id.value ||
       receipt.processAttemptId !== lease.facts.processAttemptId ||
       !sameSlotSet(receipt.installedSlotIds, expectedSlotIds)) {
-    return revokeAfterDeliveryFailure(
-      lease,
+    return reduceSecretLease(lease, {
+      type: 'require-recovery',
       atMs,
-      [{ code: 'bootstrap-rejected', message: 'Bootstrap returned inconsistent redacted receipt facts.' }]
-    );
-  }
-  return reduceSecretLease(lease, { type: 'complete', atMs }).andThen(terminal =>
-    terminal.state === 'consumed'
-      ? secretLeaseOk<SecretDeliveryTerminal>({
-          outcome: 'completed',
+      reason: 'acknowledgement-ambiguous'
+    }).andThen(terminal => terminal.state === 'recovery-required'
+      ? secretLeaseOk<SecretDeliveryOutcome>({
+          outcome: 'recovery-required',
           lease: terminal,
           leaseId: terminal.facts.id,
           processAttemptId: terminal.facts.processAttemptId,
-          deliveredSlotIds: receipt.installedSlotIds,
-          secretsCleared: true
+          deliveredSlotIds: [],
+          exposureMayHaveOccurred: true,
+          brokerCopiesReleased: receipt.brokerCopiesReleased,
+          issueCodes: ['bootstrap-rejected']
         })
-      : terminal.state === 'revoked'
-        ? secretLeaseOk<SecretDeliveryTerminal>({
-            outcome: 'revoked',
-            lease: terminal,
-            leaseId: terminal.facts.id,
-            processAttemptId: terminal.facts.processAttemptId,
-            deliveredSlotIds: receipt.installedSlotIds,
-            secretsCleared: true,
-            reason: terminal.reason,
-            issueCodes: ['lease-expired']
-          })
-        : secretLeaseErr({
-            code: 'lease-transition-invalid',
-            message: 'Bootstrap completion did not terminate its secret lease.'
-          })
+      : secretLeaseErr({ code: 'lease-transition-invalid', message: 'Exposure ambiguity was not retained.' }));
+  }
+  return reduceSecretLease(lease, { type: 'acknowledge-exposure', atMs }).andThen(exposed =>
+    exposed.state === 'exposed'
+      ? secretLeaseOk<SecretDeliveryOutcome>({
+          outcome: 'exposed',
+          lease: exposed,
+          leaseId: exposed.facts.id,
+          processAttemptId: exposed.facts.processAttemptId,
+          deliveredSlotIds: receipt.installedSlotIds,
+          environmentInstalled: receipt.environmentInstalled,
+          brokerCopiesReleased: receipt.brokerCopiesReleased
+        })
+      : secretLeaseErr({
+          code: 'lease-transition-invalid',
+          message: 'Bootstrap acknowledgement did not establish secret exposure.'
+        })
   );
 };
 
-export const activateAuthorizedSecretLease = (
+export const beginAuthorizedSecretDelivery = (
   lease: AuthorizedSecretLease,
   atMs: number
-): SecretLeaseResult<ActiveSecretLease> => reduceSecretLease(lease, { type: 'activate', atMs }).andThen(activated =>
-  activated.state === 'active'
-    ? secretLeaseOk(activated)
+): SecretLeaseResult<DeliveringSecretLease> => reduceSecretLease(lease, { type: 'begin-delivery', atMs })
+  .andThen(delivering => delivering.state === 'delivering'
+    ? secretLeaseOk(delivering)
     : secretLeaseErr({
         code: 'lease-transition-invalid',
-        message: 'Secret lease activation produced a non-active state.'
+        message: 'Secret delivery did not enter the delivering state.'
       })
-);
+  );
 
-export const deliverActiveSecretLease = (
-  active: ActiveSecretLease,
+export const deliverDeliveringSecretLease = (
+  delivering: DeliveringSecretLease,
   ports: SecretDeliveryPorts
-): SecretLeaseTaskResult<SecretDeliveryTerminal> => ports.bootstrap.runWithSecrets(
-  toBootstrapContext(active),
-  sink => deliverBindings(active.facts.bindings, 0, sink, ports.secretStore)
-).andThen(receipt => completeDelivery(active, receipt, ports.clock.nowMs()))
-  .orElse(issues => revokeAfterDeliveryFailure(active, ports.clock.nowMs(), issues));
+): SecretLeaseTaskResult<SecretDeliveryOutcome> => ports.bootstrap.runWithSecrets(
+  toBootstrapContext(delivering),
+  sink => deliverBindings(delivering.facts.bindings, 0, sink, ports.secretStore)
+).andThen(receipt => acknowledgeExposure(delivering, receipt, ports.clock.nowMs()))
+  .orElse(issues => recoverAfterDeliveryFailure(delivering, ports.clock.nowMs(), issues));
 
 export const deliverAuthorizedSecretLease = (
   lease: AuthorizedSecretLease,
   ports: SecretDeliveryPorts
-): SecretLeaseTaskResult<SecretDeliveryTerminal> => {
-  const activation = activateAuthorizedSecretLease(lease, ports.clock.nowMs());
-  if (activation.isErr()) return secretLeaseTaskErr(activation.error[0], ...activation.error.slice(1));
-  return deliverActiveSecretLease(activation.value, ports);
+): SecretLeaseTaskResult<SecretDeliveryOutcome> => {
+  const delivering = beginAuthorizedSecretDelivery(lease, ports.clock.nowMs());
+  if (delivering.isErr()) return secretLeaseTaskErr(delivering.error[0], ...delivering.error.slice(1));
+  return deliverDeliveringSecretLease(delivering.value, ports);
 };

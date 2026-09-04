@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   authorizeSecretLease,
   parseCredentialReference,
+  parseSecretExposureCleanupReceiptId,
+  parseSecretExposureCorrelation,
   parseSecretLeaseId,
   reduceSecretLease,
   type SecretDeliveryGrant,
@@ -29,10 +31,11 @@ const fixtures = (): Readonly<{
   const slotId = parseCredentialSlotId('weather-api');
   const reference = parseCredentialReference('credential-1');
   const leaseId = parseSecretLeaseId('lease-1');
+  const exposureCorrelation = parseSecretExposureCorrelation('exposure-1');
   const receiverId = parseReceiverId('pm2');
   const processAttemptId = parseProcessAttemptId('attempt-1');
   if (repository.isErr() || revision.isErr() || grantId.isErr() || slotId.isErr() || reference.isErr() ||
-      leaseId.isErr() || receiverId.isErr() || processAttemptId.isErr()) {
+      leaseId.isErr() || exposureCorrelation.isErr() || receiverId.isErr() || processAttemptId.isErr()) {
     throw new Error('typed secret lease fixture construction failed');
   }
   const binding: SecretSlotBinding = {
@@ -60,6 +63,7 @@ const fixtures = (): Readonly<{
       recipeRevision: revision.value,
       receiverId: receiverId.value,
       processAttemptId: processAttemptId.value,
+      exposureCorrelation: exposureCorrelation.value,
       bindings: [binding],
       requestedAtMs: 1_000,
       expiresAtMs: 1_500,
@@ -69,22 +73,45 @@ const fixtures = (): Readonly<{
 };
 
 describe('secret lease authority and state algebra', () => {
-  it('narrows a grant into one attempt lease and consumes it through legal transitions', () => {
+  it('keeps an acknowledged process exposed until exact tree cleanup closes it', () => {
     const fixture = fixtures();
     const authorized = authorizeSecretLease(fixture.grant, fixture.request, 1_000);
     expect(authorized.isOk()).toBe(true);
     if (authorized.isErr()) throw new Error('expected authorized secret lease');
 
-    const active = reduceSecretLease(authorized.value, { type: 'activate', atMs: 1_001 });
-    expect(active).toEqual(expect.objectContaining({ value: expect.objectContaining({ state: 'active' }) }));
-    if (active.isErr()) throw new Error('expected active secret lease');
+    const delivering = reduceSecretLease(authorized.value, { type: 'begin-delivery', atMs: 1_001 });
+    expect(delivering).toEqual(expect.objectContaining({ value: expect.objectContaining({ state: 'delivering' }) }));
+    if (delivering.isErr()) throw new Error('expected delivering secret lease');
 
-    const consumed = reduceSecretLease(active.value, { type: 'complete', atMs: 1_002 });
-    expect(consumed).toEqual(expect.objectContaining({
-      value: expect.objectContaining({ state: 'consumed', completedAtMs: 1_002 })
+    const exposed = reduceSecretLease(delivering.value, { type: 'acknowledge-exposure', atMs: 1_002 });
+    expect(exposed).toEqual(expect.objectContaining({
+      value: expect.objectContaining({ state: 'exposed', acknowledgedAtMs: 1_002 })
     }));
-    if (consumed.isErr()) throw new Error('expected consumed secret lease');
-    expect(reduceSecretLease(consumed.value, { type: 'activate', atMs: 1_003 })).toEqual(expect.objectContaining({
+    if (exposed.isErr()) throw new Error('expected exposed secret lease');
+    const closure = reduceSecretLease(exposed.value, {
+      type: 'request-closure',
+      atMs: 1_500,
+      reason: 'lease-expired'
+    });
+    if (closure.isErr()) throw new Error('expected closure-required secret lease');
+    const receiptId = parseSecretExposureCleanupReceiptId('cleanup-1');
+    if (receiptId.isErr()) throw new Error('expected cleanup receipt identity');
+    const closed = reduceSecretLease(closure.value, {
+      type: 'close',
+      atMs: 1_501,
+      receipt: {
+        format: 'secret-exposure-cleanup-receipt/v1',
+        id: receiptId.value,
+        exposureCorrelation: fixture.request.exposureCorrelation,
+        receiverId: fixture.request.receiverId,
+        processAttemptId: fixture.request.processAttemptId,
+        proof: 'exact-tree-empty',
+        observedAtMs: 1_501
+      }
+    });
+    expect(closed).toEqual(expect.objectContaining({ value: expect.objectContaining({ state: 'closed' }) }));
+    if (closed.isErr()) throw new Error('expected closed secret lease');
+    expect(reduceSecretLease(closed.value, { type: 'begin-delivery', atMs: 1_502 })).toEqual(expect.objectContaining({
       error: [expect.objectContaining({ code: 'lease-transition-invalid' })]
     }));
   });
@@ -128,19 +155,28 @@ describe('secret lease authority and state algebra', () => {
       },
       1_000
     )).toEqual(expect.objectContaining({ error: [expect.objectContaining({ code: 'lease-invalid' })] }));
+    expect(authorizeSecretLease(
+      { ...fixture.grant, bindings: [{ ...fixture.binding, environmentName: 'nebular_pm2_job_identity' }] },
+      { ...fixture.request, bindings: [{ ...fixture.binding, environmentName: 'nebular_pm2_job_identity' }] },
+      1_000
+    )).toEqual(expect.objectContaining({ error: [expect.objectContaining({ code: 'lease-invalid' })] }));
   });
 
   it('makes early expiration and post-terminal reuse explicit typed failures', () => {
     const fixture = fixtures();
     const authorized = authorizeSecretLease(fixture.grant, fixture.request, 1_000);
     if (authorized.isErr()) throw new Error('expected authorized secret lease');
-    expect(reduceSecretLease(authorized.value, { type: 'expire', atMs: 1_499 })).toEqual(expect.objectContaining({
+    expect(reduceSecretLease(authorized.value, {
+      type: 'revoke-unexposed', atMs: 1_499, reason: 'lease-expired'
+    })).toEqual(expect.objectContaining({
       error: [expect.objectContaining({ code: 'lease-transition-invalid' })]
     }));
-    const expired = reduceSecretLease(authorized.value, { type: 'expire', atMs: 1_500 });
+    const expired = reduceSecretLease(authorized.value, {
+      type: 'revoke-unexposed', atMs: 1_500, reason: 'lease-expired'
+    });
     expect(expired).toEqual(expect.objectContaining({ value: expect.objectContaining({ state: 'revoked' }) }));
     if (expired.isErr()) throw new Error('expected revoked secret lease');
-    expect(reduceSecretLease(expired.value, { type: 'complete', atMs: 1_501 })).toEqual(expect.objectContaining({
+    expect(reduceSecretLease(expired.value, { type: 'begin-delivery', atMs: 1_501 })).toEqual(expect.objectContaining({
       error: [expect.objectContaining({ code: 'lease-transition-invalid' })]
     }));
   });

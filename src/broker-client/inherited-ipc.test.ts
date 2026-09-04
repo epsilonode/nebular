@@ -117,4 +117,99 @@ describe('broker inherited Bun IPC client', () => {
     expect(result).toEqual(expect.objectContaining({ error: [expect.objectContaining({ code: 'invalid-input' })] }));
     expect(fixture.plans).toEqual([]);
   });
+
+  it('sends one exact deadline cancellation and waits for the cleanup-gated terminal', async () => {
+    const sent: BrokerControlMessage[] = [];
+    let terminations = 0;
+    const runtime: BrokerInheritedIpcRuntime = {
+      nowMs: () => 1_000 + sent.length,
+      newRequestId: () => 'ipc-request-cancelled',
+      spawn: (plan, observer) => {
+        const peer: BrokerIpcPeer = {
+          send: message => {
+            sent.push(message);
+            if (message.messageKind === 'cancel') {
+              queueMicrotask(() => {
+                observer.onMessage({
+                  protocolVersion: BROKER_PROTOCOL_VERSION,
+                  messageKind: 'terminal-failure',
+                  requestId: plan.requestId,
+                  sequence: 3,
+                  sentAtMs: 1_003,
+                  payload: { code: 'request-cancelled', message: 'Cleanup completed.' }
+                }, peer);
+                observer.onExit(1);
+              });
+            }
+            return clientOk(undefined);
+          },
+          disconnect: () => undefined,
+          terminate: () => { terminations += 1; }
+        };
+        queueMicrotask(() => observer.onMessage({
+          protocolVersion: BROKER_PROTOCOL_VERSION,
+          messageKind: 'hello',
+          requestId: plan.requestId,
+          sequence: 0,
+          sentAtMs: 1_000,
+          payload: { buildId: 'nebular-test', capabilities: ['cooperative-cancel'] }
+        }, peer));
+        return clientOk(peer);
+      }
+    };
+
+    const result = await runBrokerControlOverInheritedIpc({
+      ...request,
+      timeoutMs: 5,
+      cleanupGraceMs: 50
+    }, runtime);
+
+    expect(result).toEqual(expect.objectContaining({
+      value: expect.objectContaining({
+        terminal: { outcome: 'cancelled', code: 'request-cancelled', message: 'Cleanup completed.' }
+      })
+    }));
+    expect(sent.map(message => message.messageKind)).toEqual(['request', 'cancel']);
+    expect(terminations).toBe(0);
+  });
+
+  it('force-terminates an uncooperative broker after the bounded cleanup grace', async () => {
+    const sent: BrokerControlMessage[] = [];
+    let terminations = 0;
+    const runtime: BrokerInheritedIpcRuntime = {
+      nowMs: () => 2_000 + sent.length,
+      newRequestId: () => 'ipc-request-force-terminate',
+      spawn: (plan, observer) => {
+        const peer: BrokerIpcPeer = {
+          send: message => {
+            sent.push(message);
+            return clientOk(undefined);
+          },
+          disconnect: () => undefined,
+          terminate: () => { terminations += 1; }
+        };
+        queueMicrotask(() => observer.onMessage({
+          protocolVersion: BROKER_PROTOCOL_VERSION,
+          messageKind: 'hello',
+          requestId: plan.requestId,
+          sequence: 0,
+          sentAtMs: 2_000,
+          payload: { buildId: 'nebular-test', capabilities: ['cooperative-cancel'] }
+        }, peer));
+        return clientOk(peer);
+      }
+    };
+
+    const result = await runBrokerControlOverInheritedIpc({
+      ...request,
+      timeoutMs: 5,
+      cleanupGraceMs: 5
+    }, runtime);
+
+    expect(result).toEqual(expect.objectContaining({
+      error: [expect.objectContaining({ code: 'transport-unavailable' })]
+    }));
+    expect(sent.map(message => message.messageKind)).toEqual(['request', 'cancel']);
+    expect(terminations).toBe(1);
+  });
 });
