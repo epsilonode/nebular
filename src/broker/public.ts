@@ -22,6 +22,7 @@ export * from './operation.ts';
 export * from './amp-v1.ts';
 export * from './pm2-prerequisite.ts';
 export * from './pm2-rpc.ts';
+export * from './plan.ts';
 export * from './pm2-application-rpc.ts';
 export * from './pm2-cleanup-proof.ts';
 export * from './pm2-monitor-projection.ts';
