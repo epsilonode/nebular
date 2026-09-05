@@ -1,0 +1,11 @@
+import { type AdmittedRecipe, type RecipeDocument } from './model.ts';
+import { type RecipeRunnerResult } from './result.ts';
+export declare const RECIPE_XML_MAX_BYTES: number;
+export declare const RECIPE_XML_MAX_DEPTH = 24;
+export declare const RECIPE_XML_MAX_ELEMENTS = 256;
+export declare const RECIPE_XML_MAX_ATTRIBUTES = 1024;
+export declare const RECIPE_XML_MAX_TEXT: number;
+export declare const RECIPE_TIMEOUT_MAX_MS: number;
+export declare const decodeRecipeXml: (xml: unknown) => RecipeRunnerResult<RecipeDocument>;
+export declare const admitRecipe: (document: RecipeDocument) => RecipeRunnerResult<AdmittedRecipe>;
+export declare const decodeAndAdmitRecipeXml: (xml: unknown) => RecipeRunnerResult<AdmittedRecipe>;

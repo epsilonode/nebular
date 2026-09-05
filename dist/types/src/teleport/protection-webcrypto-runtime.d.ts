@@ -1,0 +1,16 @@
+import { CID } from 'multiformats/cid';
+import { type TeleportIssue, type TeleportResult } from './result';
+export declare const runProtectionEffect: <T>(effect: () => Promise<TeleportResult<T>>, issue: TeleportIssue) => Promise<TeleportResult<T>>;
+export declare const protectionRandomId: (issue: TeleportIssue) => TeleportResult<string>;
+export declare const protectionRandomBytes: (byteLength: number, issue: TeleportIssue) => TeleportResult<Uint8Array>;
+export declare const protectionEncode: (value: unknown, issue: TeleportIssue) => TeleportResult<Uint8Array>;
+export declare const protectionDecode: (bytes: Uint8Array, issue: TeleportIssue) => TeleportResult<unknown>;
+export declare const protectionRawCid: (bytes: Uint8Array, issue: TeleportIssue) => Promise<TeleportResult<CID>>;
+export declare const protectionBytesMatchCid: (bytes: Uint8Array, expected: CID, issue: TeleportIssue) => Promise<TeleportResult<boolean>>;
+export declare const protectionEncryptAes: (keyBytes: Uint8Array, plaintext: Uint8Array, iv: Uint8Array, additionalData: Uint8Array | undefined, issue: TeleportIssue) => Promise<TeleportResult<Uint8Array>>;
+export declare const protectionDecryptAes: (keyBytes: Uint8Array, ciphertext: Uint8Array, iv: Uint8Array, additionalData: Uint8Array | undefined, issue: TeleportIssue) => Promise<TeleportResult<Uint8Array>>;
+export declare const protectionEncryptWithPassphrase: (passphrase: string, salt: Uint8Array, iterations: number, plaintext: Uint8Array, iv: Uint8Array, issue: TeleportIssue) => Promise<TeleportResult<Uint8Array>>;
+export declare const protectionDecryptWithPassphrase: (passphrase: string, salt: Uint8Array, iterations: number, ciphertext: Uint8Array, iv: Uint8Array, issue: TeleportIssue) => Promise<TeleportResult<Uint8Array>>;
+export declare const protectionEncryptForRecipient: (publicKey: CryptoKey, plaintext: Uint8Array, issue: TeleportIssue) => Promise<TeleportResult<Uint8Array>>;
+export declare const protectionDecryptForRecipient: (privateKey: CryptoKey, ciphertext: Uint8Array, issue: TeleportIssue) => Promise<TeleportResult<Uint8Array>>;
+export declare const isRsaOaepKey: (key: CryptoKey) => boolean;

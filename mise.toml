@@ -63,6 +63,10 @@ run = "bun run build"
 description = "Verify the exact four-artifact inventory and authority graphs"
 run = "bun run verify:artifacts"
 
+[tasks.verify-teleport-github-release]
+description = "Verify an immutable GitHub/esm.sh compiled teleport.js release ref"
+run = "bun run verify:teleport-github-release"
+
 [tasks.verify-declarations]
 description = "Resolve all four package declaration surfaces from a consumer fixture"
 run = "bun run verify:declarations"

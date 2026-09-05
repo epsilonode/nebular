@@ -19,6 +19,13 @@ const build = (
   packages: 'bundle',
   allowUnresolved: [],
   env: 'disable',
+  define: target === 'browser'
+    ? {
+        'globalThis.process': 'undefined',
+        'globalThis.Buffer': 'undefined'
+      }
+    : {},
+  minify: target === 'browser' ? { syntax: true } : false,
   sourcemap: 'none',
   metafile: true,
   throw: false

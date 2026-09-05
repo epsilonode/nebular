@@ -1,0 +1,28 @@
+import { type BrokerResult } from './result.ts';
+declare const brokerPrimitive: unique symbol;
+type BrokerPrimitive<Name extends string> = string & Readonly<{
+    [brokerPrimitive]: Name;
+}>;
+export type CanonicalRepository = BrokerPrimitive<'CanonicalRepository'>;
+export type RecipeRevision = BrokerPrimitive<'RecipeRevision'>;
+export type GrantId = BrokerPrimitive<'GrantId'>;
+export type CredentialSlotId = BrokerPrimitive<'CredentialSlotId'>;
+export type ProcessAttemptId = BrokerPrimitive<'ProcessAttemptId'>;
+export type ReceiverId = BrokerPrimitive<'ReceiverId'>;
+export type ReceiverVersion = BrokerPrimitive<'ReceiverVersion'>;
+export type ReceiverPlanId = BrokerPrimitive<'ReceiverPlanId'>;
+export type ReceiverHandle = BrokerPrimitive<'ReceiverHandle'>;
+export type OutputCursor = BrokerPrimitive<'OutputCursor'>;
+export type CleanupId = BrokerPrimitive<'CleanupId'>;
+export declare const parseCanonicalRepository: (value: unknown) => BrokerResult<CanonicalRepository>;
+export declare const parseRecipeRevision: (value: unknown) => BrokerResult<RecipeRevision>;
+export declare const parseGrantId: (value: unknown) => BrokerResult<GrantId>;
+export declare const parseCredentialSlotId: (value: unknown) => BrokerResult<CredentialSlotId>;
+export declare const parseProcessAttemptId: (value: unknown) => BrokerResult<ProcessAttemptId>;
+export declare const parseReceiverId: (value: unknown) => BrokerResult<ReceiverId>;
+export declare const parseReceiverVersion: (value: unknown) => BrokerResult<ReceiverVersion>;
+export declare const parseReceiverPlanId: (value: unknown) => BrokerResult<ReceiverPlanId>;
+export declare const parseReceiverHandle: (value: unknown) => BrokerResult<ReceiverHandle>;
+export declare const parseOutputCursor: (value: unknown) => BrokerResult<OutputCursor>;
+export declare const parseCleanupId: (value: unknown) => BrokerResult<CleanupId>;
+export {};

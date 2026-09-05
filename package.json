@@ -75,6 +75,7 @@
     "build": "bun run build:runtime && bun run build:types",
     "verify:declarations": "tsc --noEmit -p tsconfig.package-consumer.json",
     "verify:artifacts": "bun tooling/verify-artifacts.ts",
+    "verify:teleport-github-release": "bun tooling/verify-teleport-github-release.ts",
     "verify:installed": "bun tooling/verify-installed-package.ts",
     "verify:lint-policy": "bun tooling/verify-lint-policy.ts",
     "verify:type-policy": "tsc --noEmit -p tsconfig.type-negative.json",

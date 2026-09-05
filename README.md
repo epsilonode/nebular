@@ -3,19 +3,19 @@
 Nebular is a browser-first portable TypeScript toolkit for moving browser application capabilities
 between browser profiles through safe, reviewable Teleport Cartridge import and export.
 
-The public source lives at `epsilonode/nebular`. Browser applications consume the compiled portable
-package export through a pinned CDN import map; they do not link this workspace or compile its
-TypeScript source:
+The public source and release artifacts live at `epsilonode/nebular`. Browser applications consume
+the committed compiled portable artifact through a pinned immutable GitHub/esm.sh import map; they do
+not link this workspace or compile its TypeScript source:
 
 ```text
-@epsilonode/nebular -> https://esm.sh/@epsilonode/nebular@<published-version>
+@epsilonode/nebular -> https://esm.sh/gh/epsilonode/nebular@<immutable-commit>/dist/teleport.js
 ```
 
-Configure the browser bundler to leave the bare package specifier external, and use the same immutable
-published package only for declaration/type resolution. GitHub/esm.sh TypeScript URLs are development
-and source-inspection paths; they are not production browser dependencies. The package may also ship
-separately constrained Bun artifacts for Bake and other Bun consumers, but browser applications never
-load or depend on them.
+Configure the browser bundler to leave the bare package specifier external, and resolve declarations
+from the same release commit without compiling source. GitHub/esm.sh TypeScript URLs remain development
+and source-inspection paths; production browser dependencies name only the committed JavaScript
+artifact. The same release commit may include separately constrained compiled Bun artifacts for Bake
+and other Bun consumers, but browser applications never load or depend on them.
 
 ## `teleport.ts`
 

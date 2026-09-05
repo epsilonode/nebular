@@ -1,7 +1,11 @@
 node_modules/
 .generated/
 coverage/
-dist/
+dist/*
+!dist/
+!dist/*.js
+!dist/types/
+!dist/types/**/*.d.ts
 test-artifacts/
 reports/
 *.log

@@ -180,6 +180,42 @@ declarationSources.forEach((source, index) => {
   }
 });
 
+const portableInputs = Object.keys(outputFor(portableEvidence, 'teleport').inputs).map(normalized);
+const invalidPortableInputs = portableInputs.filter(path =>
+  path !== 'teleport.ts' && !path.startsWith('src/teleport/') && !path.startsWith('node_modules/')
+);
+if (invalidPortableInputs.length > 0) {
+  throw new Error(`teleport.js has non-portable build inputs: ${invalidPortableInputs.join(', ')}`);
+}
+
+const portableArtifact = artifactSources[entrypointNames.indexOf('teleport')];
+if (portableArtifact === undefined) throw new Error('teleport.js is missing from the artifact inventory.');
+const forbiddenPortableLiterals = [
+  /\bBun\b/u,
+  /\bprocess\b/u,
+  /\bnode:/u,
+  /\bchild_process\b/u,
+  /\bchild-process\b/u,
+  /\bbroker-client\b/u,
+  /\brecipe-runner\b/u,
+  /\bkeychain\b/u,
+  /\bPM2\b/u,
+  /\bIPC\b/u,
+  /@wx\/teleport-cartridge/u,
+  /@bake\//u,
+  /R:[\\/]Code[\\/]/u
+] as const;
+const forbiddenPortableLiteral = forbiddenPortableLiterals.find(pattern => pattern.test(portableArtifact));
+if (forbiddenPortableLiteral !== undefined) {
+  throw new Error(`teleport.js contains a forbidden browser-runtime literal ${forbiddenPortableLiteral.source}.`);
+}
+
+const portableDeclaration = await readFile(resolve(declarationDirectory, 'teleport.d.ts'), 'utf8');
+const portablePublicDeclaration = await readFile(resolve(declarationDirectory, 'src', 'teleport', 'public.d.ts'), 'utf8');
+if (!portableDeclaration.includes("export * from './src/teleport/public.ts';") || portablePublicDeclaration.length === 0) {
+  throw new Error('teleport.js declaration root does not resolve to the portable declaration tree.');
+}
+
 const importedEntrypoints: readonly unknown[] = await Promise.all(entrypointNames.map(name =>
   import(pathToFileURL(resolve(outputDirectory, `${name}.js`)).href)
 ));
