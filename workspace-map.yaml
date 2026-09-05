@@ -19,6 +19,7 @@ orientation:
     - proj-ledger/roadmaps/broker.md
   triggers: proj-ledger/triggers.yaml
   memory_root: proj-ledger/memories/teleport
+  local_skill_root: local-skills
 
 consumers:
   - ../jtwc

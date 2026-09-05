@@ -2,6 +2,50 @@ version: 1
 purpose: Read only the memory cards matching the current Teleport concern.
 
 must_know:
+  tooling_catalog:
+    path: ../mise.toml
+    skills:
+      - toolchains/mise-toolchain
+    read_before: [project command, package operation, install, link, build, check, test, verify, smoke, runtime availability, CLI availability]
+  skill_discovery:
+    skills:
+      - discovery/find-new-skill
+      - toolchains/mise-toolchain
+    read_before: [find a skill, new skill, skills.sh, agent capability, extend the agent, install a skill, update a skill, remove a skill]
+  roadmap_maintenance:
+    path: format-guidance.md
+    skills:
+      - ledger/roadmap-maintenance
+      - mcps/patchitright-editing
+    read_before: [roadmap edit, roadmap state, acceptance evidence, blocker, proof gap, closeout state]
+  memory_authoring:
+    path: making-memories.md
+    skills:
+      - ledger/memory-authoring
+      - mcps/patchitright-editing
+    read_before: [create memory, revise memory, durable decision, contract, strategy, reusable guidance, supersede memory]
+  ledger_closeout:
+    skills:
+      - ledger/ledger-closeout
+      - ledger/roadmap-maintenance
+    read_before: [substantive work complete, durable finding, proof complete, closeout, forensic log]
+  code_discovery:
+    skills:
+      - mcps/probe-discovery
+    read_before: [unknown source area, unknown symbol, semantic code search, AST search, structural search, public remote repository]
+  relationship_analysis:
+    skills:
+      - mcps/codegraph-analysis
+    read_before: [architecture, request flow, data flow, caller, callee, symbol dependency, change impact, refactor blast radius]
+  structured_editing:
+    skills:
+      - mcps/patchitright-editing
+    read_before: [multi-file patch, non-contiguous patch, rejected patch, dirty worktree edit]
+  browser_validation:
+    skills:
+      - mcps/browser-validation
+      - mcps/edge-browser-mcp
+    read_before: [browser-facing behavior, Edge, Chromium MCP, browser fixture, import map, esm.sh, CDN delivery, CORS, preflight, DevTools Console, DevTools Network]
   credential_broker:
     path: roadmaps/broker.md
     read_before: [api tokens, credentials, OS keychain, agent secret requests, encrypted CAR PIN or passphrase, child-process environment injection, credential requirements]
