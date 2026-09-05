@@ -8,7 +8,7 @@ the committed compiled portable artifact through a pinned immutable GitHub/esm.s
 not link this workspace or compile its TypeScript source:
 
 ```text
-@epsilonode/nebular -> https://esm.sh/gh/epsilonode/nebular@<immutable-commit>/dist/teleport.js
+@epsilonode/nebular -> https://esm.sh/gh/epsilonode/nebular@<immutable-commit>/dist/teleport.js?target=es2023
 ```
 
 Configure the browser bundler to leave the bare package specifier external, and resolve declarations

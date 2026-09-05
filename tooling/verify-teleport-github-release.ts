@@ -17,7 +17,7 @@ const [artifact, declaration] = await Promise.all([
 ]);
 const rawArtifactUrl = `https://raw.githubusercontent.com/epsilonode/nebular/${gitRef}/dist/teleport.js`;
 const rawDeclarationUrl = `https://raw.githubusercontent.com/epsilonode/nebular/${gitRef}/dist/types/teleport.d.ts`;
-const esmUrl = `https://esm.sh/gh/epsilonode/nebular@${gitRef}/dist/teleport.js`;
+const esmUrl = `https://esm.sh/gh/epsilonode/nebular@${gitRef}/dist/teleport.js?target=es2023`;
 const [rawArtifactResponse, rawDeclarationResponse, esmResponse] = await Promise.all([
   fetch(rawArtifactUrl),
   fetch(rawDeclarationUrl),
@@ -38,11 +38,29 @@ if (digest(artifact) !== digest(remoteArtifact)) {
 if (digest(declaration) !== digest(remoteDeclaration)) {
   throw new Error('The committed GitHub teleport declaration does not match local dist/types/teleport.d.ts.');
 }
-const expectedArtifactPath = `/gh/epsilonode/nebular@${gitRef}/dist/teleport.js`;
-if (!esmSource.includes(expectedArtifactPath) || esmSource.includes('/teleport.ts')) {
+const expectedModulePath = `/gh/epsilonode/nebular@${gitRef}/es2023/nebular.mjs`;
+if (!esmSource.includes(expectedModulePath) || esmSource.includes('/teleport.ts')) {
   throw new Error('esm.sh did not resolve the selected compiled teleport.js GitHub artifact.');
 }
-const foreignNebularRefs = [...esmSource.matchAll(/\/gh\/epsilonode\/nebular@([^/'"]+)/gu)]
+const esmModuleResponse = await fetch(new URL(expectedModulePath, esmResponse.url));
+if (!esmModuleResponse.ok) {
+  throw new Error(`esm.sh compiled teleport.js module fetch failed with HTTP ${esmModuleResponse.status}.`);
+}
+const esmModuleSource = await esmModuleResponse.text();
+const forbiddenModuleLiterals = [
+  /\bBun\b/u,
+  /\bprocess\b/u,
+  /\bnode:/u,
+  /\bbroker-client\b/u,
+  /\brecipe-runner\b/u,
+  /\bsrc\/teleport\b/u,
+  /\/teleport\.ts/u
+] as const;
+const forbiddenModuleLiteral = forbiddenModuleLiterals.find(pattern => pattern.test(esmModuleSource));
+if (forbiddenModuleLiteral !== undefined) {
+  throw new Error(`esm.sh compiled teleport.js module contains forbidden text ${forbiddenModuleLiteral.source}.`);
+}
+const foreignNebularRefs = [...`${esmSource}\n${esmModuleSource}`.matchAll(/\/gh\/epsilonode\/nebular@([^/'"]+)/gu)]
   .map(match => match[1])
   .filter((ref): ref is string => ref !== undefined && ref !== gitRef);
 if (foreignNebularRefs.length > 0) {
